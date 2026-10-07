@@ -1,1 +1,95 @@
-/* You can add global styles to this file, and also import other style files */
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/600.css';
+@import 'primeicons/primeicons.css';
+
+:root {
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+  --space-3xl: 64px;
+
+  --sidebar-width: 240px;
+  --sidebar-collapsed: 64px;
+  --topbar-height: 56px;
+  --panel-width: 360px;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 400;
+  background: #F4F8FC;
+  color: #1F2A37;
+}
+
+/* Type roles */
+.text-label {
+  font-size: 12px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.text-section {
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.text-heading {
+  font-size: 20px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+.text-display {
+  font-size: 28px;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+/* Hidden until it receives keyboard focus */
+.skip-link {
+  position: absolute;
+  left: var(--space-md);
+  top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: #FFFFFF;
+  color: #1F2A37;
+  border: 2px solid #2F6DB8;
+  border-radius: 6px;
+  z-index: 1000;
+  transform: translateY(-200%);
+}
+
+.skip-link:focus {
+  transform: translateY(0);
+}
+
+/* Prevent mobile browsers from zooming into focused inputs */
+@media (max-width: 767px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
