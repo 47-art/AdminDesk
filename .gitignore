@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+publish/
+
+# Angular / Node
+node_modules/
+dist/
+.angular/
+
+# Data and secrets
+*.db
+*.db-shm
+*.db-wal
+.env
+appsettings.*.local.json
+logs/
+uploads/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+data/

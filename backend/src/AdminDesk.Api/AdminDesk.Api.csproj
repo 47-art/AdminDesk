@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.25" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AdminDesk.Application\AdminDesk.Application.csproj" />
+    <ProjectReference Include="..\AdminDesk.Infrastructure\AdminDesk.Infrastructure.csproj" />
+    <ProjectReference Include="..\AdminDesk.SharedKernel\AdminDesk.SharedKernel.csproj" />
+  </ItemGroup>
+
+</Project>
