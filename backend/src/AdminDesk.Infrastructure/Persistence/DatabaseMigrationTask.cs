@@ -1,5 +1,6 @@
 using AdminDesk.Application.Abstractions;
 using AdminDesk.Application.Abstractions.Persistence;
+using AdminDesk.Infrastructure.Logging;
 using DbUp;
 using Microsoft.Extensions.Logging;
 
@@ -45,6 +46,7 @@ public sealed class DatabaseMigrationTask : IStartupTask
             throw new InvalidOperationException("Database upgrade failed", result.Error);
         }
 
+        LogDatabaseGate.Open();
         _logger.LogInformation("Database is up to date ({Count} scripts applied this start)", result.Scripts.Count());
     }
 }
