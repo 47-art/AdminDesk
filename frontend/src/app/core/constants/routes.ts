@@ -1,0 +1,13 @@
+export const ROUTE_PATHS = {
+  Login: 'login',
+  Dashboard: 'dashboard',
+  Inbox: 'inbox',
+  MyRequests: 'requests',
+  NewRequest: 'new',
+  RequestDetail: 'request',
+  Team: 'team',
+  Forbidden: 'forbidden',
+  NotFound: 'not-found',
+} as const;
+
+export type RoutePath = (typeof ROUTE_PATHS)[keyof typeof ROUTE_PATHS];
