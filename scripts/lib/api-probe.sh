@@ -9,6 +9,7 @@
 #   api_wait_log REGEX SECONDS        poll the process output for a matching line
 #   api_wait_exit SECONDS             wait for the process to end, print its exit code
 #   api_stop                          kill the whole process tree and wait for the port
+#   dbquery DB SQL                    run one SQL statement against a database file
 #
 # Build the solution first; the dll is started directly, never through a launcher.
 
@@ -164,4 +165,16 @@ api_stop() {
   API_PID=""
   API_WINPID=""
   return 0
+}
+
+# Runs the small SQL runner (no sqlite3 command-line tool is assumed). The runner is
+# built once, when its dll is missing.
+dbquery() {
+  local root dll
+  root="$(_probe_root)"
+  dll="$root/scripts/dbquery/bin/Debug/net10.0/DbQuery.dll"
+  if [ ! -f "$dll" ]; then
+    dotnet build "$(_probe_path "$root/scripts/dbquery/DbQuery.csproj")" -nologo -v q >/dev/null || return 1
+  fi
+  dotnet "$(_probe_path "$dll")" "$(_probe_path "$1")" "$2"
 }
