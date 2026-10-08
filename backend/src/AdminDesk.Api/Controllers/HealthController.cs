@@ -1,7 +1,6 @@
 using AdminDesk.Application.Abstractions.Persistence;
 using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Responses;
-using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -22,11 +21,10 @@ public class HealthController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<HealthStatus>>> Get(CancellationToken ct)
     {
+        // Opening the connection proves the database is reachable; nothing about it is reported.
         await using var connection = await _connections.OpenAsync(ct);
-        var scripts = await connection.ExecuteScalarAsync<int>(
-            new CommandDefinition("SELECT COUNT(*) FROM SchemaVersions", cancellationToken: ct));
-        return Ok(ApiResponse<HealthStatus>.Ok(new HealthStatus("ok", DateTime.UtcNow, scripts)));
+        return Ok(ApiResponse<HealthStatus>.Ok(new HealthStatus("ok")));
     }
 }
 
-public record HealthStatus(string Status, DateTime UtcNow, int SchemaScripts);
+public record HealthStatus(string Status);
