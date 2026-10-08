@@ -130,6 +130,21 @@ public sealed class EmployeeRepository : IEmployeeRepository
         return rows.Select(r => new LookupItem(r.Id, r.Code, r.Label, r.Secondary as string)).ToList();
     }
 
+    public async Task<IReadOnlyList<LookupItem>> GetLabelsAsync(IReadOnlyCollection<long> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0)
+        {
+            return Array.Empty<LookupItem>();
+        }
+        await using var connection = await _factory.OpenAsync(ct);
+        var rows = await connection.QueryAsync<LookupRow>(new CommandDefinition(
+            "SELECT e.id AS Id, e.employee_code AS Code, e.full_name AS Label, " +
+            "e.employee_code || ' - ' || COALESCE(d.name, '') AS Secondary " +
+            "FROM employees e LEFT JOIN departments d ON d.id = e.department_id WHERE e.id IN @Ids",
+            new { Ids = ids.Distinct().ToArray() }, cancellationToken: ct));
+        return rows.Select(r => new LookupItem(r.Id, r.Code, r.Label, r.Secondary as string)).ToList();
+    }
+
     // Computed columns have no declared type, so the text column is read as an object.
     private sealed class LookupRow
     {

@@ -7,11 +7,13 @@ public interface ILookupProvider
 
     Task<IReadOnlyList<LookupItem>> SearchAsync(string q, int take, CancellationToken ct);
 
+    // The label of one item, whether or not it is still active.
     Task<LookupItem?> GetAsync(long id, CancellationToken ct);
 
     Task<bool> ExistsAsync(long id, CancellationToken ct);
 
-    // The items for the given ids in one go; ids that do not exist or are inactive are left out.
+    // The items for the given ids in one go; ids that do not exist are left out. Inactive items are still
+    // returned so a request keeps showing their label; only search and ExistsAsync filter by active.
     // The default asks one at a time; providers backed by a table override it with one query.
     async Task<IReadOnlyList<LookupItem>> GetManyAsync(IReadOnlyCollection<long> ids, CancellationToken ct)
     {

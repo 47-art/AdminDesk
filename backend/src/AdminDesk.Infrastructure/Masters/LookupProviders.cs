@@ -41,11 +41,12 @@ public abstract class SimpleMasterLookupProvider : ILookupProvider
         return rows.ToList();
     }
 
+    // Label lookups do not filter by active, so an item deactivated since still shows its label on a request.
     public async Task<LookupItem?> GetAsync(long id, CancellationToken ct)
     {
         await using var connection = await _factory.OpenAsync(ct);
         return await connection.QueryFirstOrDefaultAsync<LookupItem>(new CommandDefinition(
-            Select + "WHERE t.id = @Id AND " + AuditSql.Active("t"),
+            Select + "WHERE t.id = @Id",
             new { Id = id }, cancellationToken: ct));
     }
 
@@ -57,7 +58,7 @@ public abstract class SimpleMasterLookupProvider : ILookupProvider
         }
         await using var connection = await _factory.OpenAsync(ct);
         var rows = await connection.QueryAsync<LookupItem>(new CommandDefinition(
-            Select + "WHERE t.id IN @Ids AND " + AuditSql.Active("t"),
+            Select + "WHERE t.id IN @Ids",
             new { Ids = ids.Distinct().ToArray() }, cancellationToken: ct));
         return rows.ToList();
     }
@@ -118,11 +119,12 @@ public sealed class EmployeeLookupProvider : ILookupProvider
     public Task<IReadOnlyList<LookupItem>> SearchAsync(string q, int take, CancellationToken ct) =>
         _employees.SearchLookupAsync(q, take, ct);
 
-    public async Task<LookupItem?> GetAsync(long id, CancellationToken ct)
-    {
-        var e = await _employees.GetByIdAsync(id, ct);
-        return e is null ? null : new LookupItem(e.Id, e.Code, e.FullName, e.Code + " - " + e.DepartmentName);
-    }
+    // Label lookups do not filter by active, so an employee deactivated since still shows on a request.
+    public async Task<LookupItem?> GetAsync(long id, CancellationToken ct) =>
+        (await _employees.GetLabelsAsync(new[] { id }, ct)).FirstOrDefault();
+
+    public Task<IReadOnlyList<LookupItem>> GetManyAsync(IReadOnlyCollection<long> ids, CancellationToken ct) =>
+        _employees.GetLabelsAsync(ids, ct);
 
     public async Task<bool> ExistsAsync(long id, CancellationToken ct) =>
         await _employees.GetByIdAsync(id, ct) is not null;

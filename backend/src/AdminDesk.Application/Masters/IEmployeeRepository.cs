@@ -22,4 +22,7 @@ public interface IEmployeeRepository
     Task<PagedResult<TeamMemberRow>> ListAllAsync(string? q, int page, int pageSize, CancellationToken ct);
 
     Task<IReadOnlyList<LookupItem>> SearchLookupAsync(string q, int take, CancellationToken ct);
+
+    // Labels for the given ids, including employees who were deactivated since, so a request keeps showing them.
+    Task<IReadOnlyList<LookupItem>> GetLabelsAsync(IReadOnlyCollection<long> ids, CancellationToken ct);
 }

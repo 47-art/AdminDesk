@@ -152,6 +152,15 @@ internal sealed class EngineProbeMasterChecks
 
     // ---------------------------------------------------------------- 36 lookups
 
+    private async Task CheckInactiveLabelAsync(string kind, long id, string name, CancellationToken ct)
+    {
+        var provider = _k.Lookups.Find(kind)!;
+        _k.Check(await provider.GetAsync(id, ct) is not null, $"36: the {kind} label of a deactivated item was not resolved");
+        _k.Check((await provider.GetManyAsync(new[] { id }, ct)).Count == 1, $"36: the {kind} labels of a deactivated item were not resolved");
+        _k.Check(!await provider.ExistsAsync(id, ct), $"36: a deactivated {kind} still passed validation");
+        _k.Check((await provider.SearchAsync(name, 50, ct)).All(i => i.Id != id), $"36: a deactivated {kind} was offered in search");
+    }
+
     private async Task LookupsAsync(CancellationToken ct)
     {
         async Task<List<LookupItem>> SearchAllAsync(string kind) =>
@@ -195,7 +204,24 @@ internal sealed class EngineProbeMasterChecks
             }
         }
 
-        var nothingHeld = await _service.GetHoldingsAsync(987654321, ct);
+        // Labels still resolve for an item that was deactivated; search and validation skip it. A seeded row is
+        // deactivated for the checks and switched back on afterwards.
+        foreach (var (kind, table) in new[] { ("department", "departments"), ("location", "locations"), ("project", "projects"), ("employee", "employees") })
+        {
+            var id = await _k.ScalarAsync<long>($"SELECT MAX(id) FROM {table} WHERE is_active = 1");
+            var name = await _k.ScalarAsync<string>($"SELECT {(table == "employees" ? "full_name" : "name")} FROM {table} WHERE id = {id}");
+            await _k.ExecuteRawAsync($"UPDATE {table} SET is_active = 0, deleted_utc = '2026-01-02T00:00:00Z' WHERE id = {id}");
+            try
+            {
+                await CheckInactiveLabelAsync(kind, id, name, ct);
+            }
+            finally
+            {
+                await _k.ExecuteRawAsync($"UPDATE {table} SET is_active = 1, deleted_utc = NULL WHERE id = {id}");
+            }
+        }
+
+        var nothingHeld =await _service.GetHoldingsAsync(987654321, ct);
         _k.Check(nothingHeld.Sims.Count == 0 && nothingHeld.Assets.Count == 0 && nothingHeld.IdCard is null,
             "36: the holdings of an employee who holds nothing were not empty");
 
