@@ -178,6 +178,27 @@ internal sealed class EngineProbeMasterChecks
         var filtered = await _k.Lookups.Find(MasterLookupKinds.AvailableAsset)!.SearchAsync("Latitude", 50, ct);
         _k.Check(filtered.Count >= 1 && filtered.All(i => i.Label.Contains("Latitude")), "36: searching the asset lookup by model failed");
 
+        // An empty result must come back as an empty list, not as a failure.
+        foreach (var kind in new[] { MasterLookupKinds.AvailableSim, MasterLookupKinds.HeldSim, MasterLookupKinds.AvailableAsset, MasterLookupKinds.HeldAsset })
+        {
+            var provider = _k.Lookups.Find(kind)!;
+            try
+            {
+                var none = await provider.SearchAsync("no-such-item-zzz", 50, ct);
+                _k.Check(none.Count == 0, $"36: searching {kind} for text that matches nothing returned items");
+                _k.Check((await provider.GetManyAsync(new long[] { 987654321 }, ct)).Count == 0 && await provider.GetAsync(987654321, ct) is null,
+                    $"36: looking up an unknown id in {kind} returned an item");
+            }
+            catch (Exception exception)
+            {
+                _k.Check(false, $"36: an empty {kind} lookup failed: {exception.Message}");
+            }
+        }
+
+        var nothingHeld = await _service.GetHoldingsAsync(987654321, ct);
+        _k.Check(nothingHeld.Sims.Count == 0 && nothingHeld.Assets.Count == 0 && nothingHeld.IdCard is null,
+            "36: the holdings of an employee who holds nothing were not empty");
+
         var many = await _k.Lookups.Find(MasterLookupKinds.HeldSim)!.GetManyAsync(heldSimIds.Concat(availableSimIds).ToArray(), ct);
         // Label lookups return every item asked for, so a request keeps showing the label of an item that was
         // allocated or returned since. Eligibility applies to search and validation only.

@@ -71,11 +71,11 @@ public abstract class MasterItemLookupProvider : ILookupProvider
         var sql = Select + "WHERE " + Eligible + search + $" ORDER BY t.{_codeColumn}, t.id " + _dialect.LimitOffset("@Limit", "@Offset");
 
         await using var connection = await _factory.OpenAsync(ct);
-        var rows = await connection.QueryAsync<LookupItem>(new CommandDefinition(
+        var rows = await connection.QueryAsync<LookupRow>(new CommandDefinition(
             sql,
             new { Q = filtered ? "%" + _dialect.EscapeLikeValue(q) + "%" : string.Empty, Limit = take, Offset = 0 },
             cancellationToken: ct));
-        return rows.ToList();
+        return rows.Select(r => r.ToItem()).ToList();
     }
 
     // Label lookups: an item that was allocated or returned since still has to show its label on a request,
@@ -83,8 +83,9 @@ public abstract class MasterItemLookupProvider : ILookupProvider
     public async Task<LookupItem?> GetAsync(long id, CancellationToken ct)
     {
         await using var connection = await _factory.OpenAsync(ct);
-        return await connection.QueryFirstOrDefaultAsync<LookupItem>(new CommandDefinition(
+        var row = await connection.QueryFirstOrDefaultAsync<LookupRow>(new CommandDefinition(
             Select + "WHERE t.id = @Id", new { Id = id }, cancellationToken: ct));
+        return row?.ToItem();
     }
 
     public async Task<IReadOnlyList<LookupItem>> GetManyAsync(IReadOnlyCollection<long> ids, CancellationToken ct)
@@ -94,9 +95,9 @@ public abstract class MasterItemLookupProvider : ILookupProvider
             return Array.Empty<LookupItem>();
         }
         await using var connection = await _factory.OpenAsync(ct);
-        var rows = await connection.QueryAsync<LookupItem>(new CommandDefinition(
+        var rows = await connection.QueryAsync<LookupRow>(new CommandDefinition(
             Select + "WHERE t.id IN @Ids", new { Ids = ids.Distinct().ToArray() }, cancellationToken: ct));
-        return rows.ToList();
+        return rows.Select(r => r.ToItem()).ToList();
     }
 
     public async Task<bool> ExistsAsync(long id, CancellationToken ct)
@@ -106,6 +107,22 @@ public abstract class MasterItemLookupProvider : ILookupProvider
             $"SELECT COUNT(*) FROM {_table} t WHERE t.id = @Id AND " + Eligible, new { Id = id }, cancellationToken: ct));
         return count > 0;
     }
+}
+
+// Computed columns have no declared type, and an empty result makes the driver report them as byte[], which
+// Dapper cannot map to a string. The two text columns are read as objects and converted here.
+internal sealed class LookupRow
+{
+    public long Id { get; set; }
+
+    public string Code { get; set; } = string.Empty;
+
+    public object? Label { get; set; }
+
+    public object? Secondary { get; set; }
+
+    public LookupItem ToItem() =>
+        new(Id, Code, Convert.ToString(Label) ?? string.Empty, Convert.ToString(Secondary));
 }
 
 public abstract class SimLookupProvider : MasterItemLookupProvider
