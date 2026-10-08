@@ -11,11 +11,12 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ButtonDirective } from 'primeng/button';
 import { Dialog } from 'primeng/dialog';
 import { Message } from 'primeng/message';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { forkJoin, from, of } from 'rxjs';
+import { catchError, concatMap, map, toArray } from 'rxjs/operators';
 
 import { ApiError, userMessage } from '../../core/api/api-error';
 import { AuthApi } from '../../core/api/auth.api';
+import { ACCEPT_ATTRIBUTE, DocumentsApi, checkDocumentFile } from '../../core/api/documents.api';
 import { MeResponse, ModuleDefinitionDto } from '../../core/api/models';
 import { ModulesApi } from '../../core/api/modules.api';
 import { RequestsApi } from '../../core/api/requests.api';
@@ -86,6 +87,39 @@ const TOP_BAR_OFFSET_PX = 72 + 16;
       outline: 2px solid var(--p-primary-color);
       outline-offset: 2px;
     }
+    .attachments {
+      margin-top: var(--space-lg);
+    }
+    .attachments h2 {
+      margin: 0 0 var(--space-xs);
+    }
+    .hint {
+      margin: 0 0 var(--space-md);
+      color: var(--p-text-muted-color);
+    }
+    .hidden-input {
+      display: none;
+    }
+    .problem {
+      margin: var(--space-sm) 0 0;
+      color: var(--p-red-700, #b91c1c);
+    }
+    .chosen {
+      list-style: none;
+      margin: var(--space-sm) 0 0;
+      padding: 0;
+    }
+    .chosen li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+      padding: var(--space-xs) 0;
+      border-top: 1px solid var(--p-content-border-color);
+    }
+    .chosen .name {
+      overflow-wrap: anywhere;
+    }
     .no-employee {
       flex: 1;
     }
@@ -134,6 +168,52 @@ const TOP_BAR_OFFSET_PX = 72 + 16;
         />
       </form>
 
+      <section class="card attachments" aria-labelledby="attachments-title">
+        <h2 id="attachments-title" class="text-section">Attachments (optional)</h2>
+        <p class="hint">Files are uploaded as soon as the request is created. Up to 5 MB each.</p>
+        <input
+          #picker
+          class="hidden-input"
+          type="file"
+          multiple
+          tabindex="-1"
+          [attr.accept]="accept"
+          (change)="onFilesPicked(picker)"
+        />
+        <button
+          pButton
+          type="button"
+          icon="pi pi-paperclip"
+          label="Add files"
+          severity="secondary"
+          [outlined]="true"
+          [disabled]="submitting()"
+          (click)="picker.click()"
+        ></button>
+        @if (fileProblem(); as problem) {
+          <p class="problem" role="alert">{{ problem }}</p>
+        }
+        @if (files().length > 0) {
+          <ul class="chosen" aria-label="Chosen files" aria-live="polite">
+            @for (file of files(); track $index) {
+              <li>
+                <span class="name">{{ file.name }}</span>
+                <button
+                  pButton
+                  type="button"
+                  icon="pi pi-times"
+                  severity="secondary"
+                  [text]="true"
+                  [disabled]="submitting()"
+                  [attr.aria-label]="'Remove ' + file.name + ' from the selection'"
+                  (click)="removeFile($index)"
+                ></button>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
       <div class="footer">
         @if (noEmployee()) {
           <p-message class="no-employee" severity="warn">{{ noEmployeeMessage }}</p-message>
@@ -175,6 +255,7 @@ export class RequestFormPage implements OnInit, HasUnsavedChanges {
   private readonly router = inject(Router);
   private readonly modulesApi = inject(ModulesApi);
   private readonly requestsApi = inject(RequestsApi);
+  private readonly documentsApi = inject(DocumentsApi);
   private readonly authApi = inject(AuthApi);
   private readonly auth = inject(AuthService);
   private readonly notifications = inject(NotificationService);
@@ -192,6 +273,9 @@ export class RequestFormPage implements OnInit, HasUnsavedChanges {
   protected readonly noEmployee = signal(false);
   protected readonly summaryCount = signal(0);
   protected readonly discardOpen = signal(false);
+  protected readonly files = signal<File[]>([]);
+  protected readonly fileProblem = signal<string | null>(null);
+  protected readonly accept = ACCEPT_ATTRIBUTE;
 
   protected readonly title = computed(() => {
     const name = (this.definition()?.name ?? '').replace(/\s+request$/i, '').trim();
@@ -273,7 +357,7 @@ export class RequestFormPage implements OnInit, HasUnsavedChanges {
       next: (created) => {
         this.submitted = true;
         this.notifications.success(`Request ${created.requestNo} submitted`, 'Submitted');
-        void this.router.navigate(['/', ROUTE_PATHS.RequestDetail, created.id]);
+        this.uploadChosen(created.id);
       },
       error: (err: unknown) => {
         group.enable({ emitEvent: false });
@@ -282,6 +366,60 @@ export class RequestFormPage implements OnInit, HasUnsavedChanges {
         this.handleError(err, group, common);
       },
     });
+  }
+
+  /** Uploads the chosen files one after another, then opens the request; failures are named in a warning. */
+  private uploadChosen(requestId: number): void {
+    const chosen = this.files();
+    const open = (): void => {
+      void this.router.navigate(['/', ROUTE_PATHS.RequestDetail, requestId]);
+    };
+    if (chosen.length === 0) {
+      open();
+      return;
+    }
+    from(chosen)
+      .pipe(
+        concatMap((file) =>
+          this.documentsApi.upload(requestId, file).pipe(
+            map(() => null),
+            catchError(() => of(file.name)),
+          ),
+        ),
+        toArray(),
+      )
+      .subscribe((results) => {
+        const failed = results.filter((n): n is string => n !== null);
+        if (failed.length > 0) {
+          this.notifications.warn(
+            `These files were not uploaded: ${failed.join(', ')}. Add them again from the request page.`,
+            'Some files missing',
+          );
+        }
+        open();
+      });
+  }
+
+  protected onFilesPicked(input: HTMLInputElement): void {
+    const picked = Array.from(input.files ?? []);
+    input.value = '';
+    const problems: string[] = [];
+    const next = [...this.files()];
+    for (const file of picked) {
+      const issue = checkDocumentFile(file);
+      if (issue) {
+        problems.push(issue);
+      } else if (!next.some((f) => f.name === file.name && f.size === file.size)) {
+        next.push(file);
+      }
+    }
+    this.files.set(next);
+    this.fileProblem.set(problems.length > 0 ? problems.join(' ') : null);
+  }
+
+  protected removeFile(index: number): void {
+    this.files.set(this.files().filter((_, i) => i !== index));
+    this.fileProblem.set(null);
   }
 
   private handleError(err: unknown, group: FieldGroup, common: CommonGroup): void {
@@ -339,7 +477,7 @@ export class RequestFormPage implements OnInit, HasUnsavedChanges {
   }
 
   private hasInput(): boolean {
-    return !!(this.group()?.dirty || this.commonGroup()?.dirty);
+    return !!(this.group()?.dirty || this.commonGroup()?.dirty || this.files().length > 0);
   }
 
   /** Reloading or closing the tab with typed input asks first. */
