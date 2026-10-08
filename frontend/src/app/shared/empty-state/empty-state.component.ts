@@ -32,7 +32,7 @@ import { ButtonDirective } from 'primeng/button';
   template: `
     <div class="empty">
       @if (icon()) {
-        <i class="pi icon" [class]="icon()" aria-hidden="true"></i>
+        <i class="pi icon" [class]="icon()" [style.color]="iconColour() || null" aria-hidden="true"></i>
       }
       <h2 class="title text-heading">{{ title() }}</h2>
       @if (body()) {
@@ -48,6 +48,7 @@ import { ButtonDirective } from 'primeng/button';
 })
 export class EmptyStateComponent {
   readonly icon = input<string>('');
+  readonly iconColour = input<string>('');
   readonly title = input.required<string>();
   readonly body = input<string>('');
   readonly actionLabel = input<string>('');
