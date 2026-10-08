@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { ButtonDirective } from 'primeng/button';
 import { Skeleton } from 'primeng/skeleton';
 
+import { Holdings, MastersApi } from '../../core/api/masters.api';
 import { DashboardSummary } from '../../core/api/models';
 import { RequestsApi } from '../../core/api/requests.api';
 import { AuthService } from '../../core/auth/auth.service';
@@ -10,7 +11,7 @@ import { ROLE_GROUPS } from '../../core/constants/roles';
 import { ROUTE_PATHS } from '../../core/constants/routes';
 import { REQUEST_STATUSES } from '../../core/constants/statuses';
 import { EmptyStateComponent } from '../../shared/empty-state/empty-state.component';
-import { relativeTime } from '../../shared/formatters/dates';
+import { formatDate, parseDateOnly, relativeTime } from '../../shared/formatters/dates';
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.component';
 
 interface Counter {
@@ -106,6 +107,31 @@ interface Counter {
         grid-template-columns: 1fr auto;
       }
     }
+    .holdings {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      padding: var(--space-md);
+      margin-bottom: var(--space-xl, 32px);
+    }
+    .holdings h3 {
+      margin: 0;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--p-text-muted-color);
+    }
+    .holdings ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .holdings li {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-md);
+      padding: var(--space-xs) 0;
+    }
     .link {
       color: var(--p-primary-color);
       text-decoration: none;
@@ -148,6 +174,45 @@ interface Counter {
         }
       </div>
 
+      @if (hasProfile) {
+        <h2 class="text-heading">Items I hold</h2>
+        @if (holdings(); as h) {
+          @if (h.sims.length + h.assets.length === 0 && !h.idCard) {
+            <app-empty-state icon="pi-box" title="You hold no company items" body="SIM cards, assets and your ID card show here while you hold them." />
+          } @else {
+            <div class="card holdings">
+              @if (h.sims.length > 0) {
+                <h3>SIM</h3>
+                <ul>
+                  @for (item of h.sims; track item.id) {
+                    <li><span>{{ item.label }}</span><span class="secondary">since {{ since(item.since) }}</span></li>
+                  }
+                </ul>
+              }
+              @if (h.assets.length > 0) {
+                <h3>Assets</h3>
+                <ul>
+                  @for (item of h.assets; track item.id) {
+                    <li><span>{{ item.label }}</span><span class="secondary">since {{ since(item.since) }}</span></li>
+                  }
+                </ul>
+              }
+              @if (h.idCard; as card) {
+                <h3>ID card</h3>
+                <ul>
+                  <li><span>{{ card.label }}</span><span class="secondary">since {{ since(card.since) }}</span></li>
+                </ul>
+              }
+            </div>
+          }
+        } @else if (holdingsFailed()) {
+          <div class="card error" role="alert">
+            <span>We could not load the items you hold.</span>
+            <button pButton type="button" severity="secondary" [text]="true" (click)="loadHoldings()">Try again</button>
+          </div>
+        }
+      }
+
       <h2 class="text-heading">Recent activity</h2>
       @if (data.recent.length === 0) {
         <app-empty-state
@@ -184,6 +249,8 @@ export class DashboardPage implements OnInit {
   private readonly api = inject(RequestsApi);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
+  private readonly masters = inject(MastersApi);
+  protected readonly hasProfile = this.auth.hasEmployeeProfile();
   /** Technical roles have no business list pages, so their counters are plain numbers. */
   protected readonly canOpenLists = !this.auth.hasAnyRole(ROLE_GROUPS.TechnicalOnly);
 
@@ -191,9 +258,25 @@ export class DashboardPage implements OnInit {
   protected readonly skeletons = [1, 2, 3, 4, 5, 6, 7];
   protected readonly summary = signal<DashboardSummary | null>(null);
   protected readonly failed = signal(false);
+  protected readonly holdings = signal<Holdings | null>(null);
+  protected readonly holdingsFailed = signal(false);
 
   ngOnInit(): void {
     this.load();
+    if (this.hasProfile) this.loadHoldings();
+  }
+
+  protected loadHoldings(): void {
+    this.holdingsFailed.set(false);
+    this.masters.myHoldings().subscribe({
+      next: (data) => this.holdings.set(data),
+      error: () => this.holdingsFailed.set(true),
+    });
+  }
+
+  /** The since value is a calendar day, or a full timestamp for items allocated through a request. */
+  protected since(value: string): string {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatDate(parseDateOnly(value)) : formatDate(value);
   }
 
   protected load(): void {
