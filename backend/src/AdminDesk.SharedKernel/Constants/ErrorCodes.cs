@@ -14,5 +14,8 @@ public static class ErrorCodes
     public const string NOT_FOUND = "NOT_FOUND";
     public const string STATE_CONFLICT = "STATE_CONFLICT";
     public const string DEFINITION_INVALID = "DEFINITION_INVALID";
+    public const string DOCUMENT_TOO_LARGE = "DOCUMENT_TOO_LARGE";
+    public const string DOCUMENT_TYPE_NOT_ALLOWED = "DOCUMENT_TYPE_NOT_ALLOWED";
+    public const string DOCUMENT_REQUIRED = "DOCUMENT_REQUIRED";
     public const string INTERNAL_ERROR = "INTERNAL_ERROR";
 }

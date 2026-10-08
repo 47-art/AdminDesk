@@ -39,6 +39,14 @@ public sealed class AuthModule : IServiceModule
             options.AddPolicy(Policies.AuditViewers, p => p.RequireRole(Roles.AuditViewers));
             options.AddPolicy(Policies.OrganisationWide, p => p.RequireRole(Roles.OrganisationWide));
             options.AddPolicy(Policies.TeamViewers, p => p.RequireRole(Policies.TeamViewerRoles));
+            options.AddPolicy(Policies.LimitEditors, p => p.RequireRole(Roles.LimitEditors));
+            options.AddPolicy(Policies.ConfigViewers, p => p.RequireRole(Roles.LimitEditors));
+            options.AddPolicy(Policies.SimMasterViewers, p => p.RequireRole(Roles.SimMasterViewers));
+            options.AddPolicy(Policies.AssetMasterViewers, p => p.RequireRole(Roles.AssetMasterViewers));
+            options.AddPolicy(Policies.IdCardMasterViewers, p => p.RequireRole(Roles.IdCardMasterViewers));
+            options.AddPolicy(Policies.SimMasterEditors, p => p.RequireRole(Roles.SimMasterEditors));
+            options.AddPolicy(Policies.AssetMasterEditors, p => p.RequireRole(Roles.AssetMasterEditors));
+            options.AddPolicy(Policies.IdCardMasterEditors, p => p.RequireRole(Roles.IdCardMasterEditors));
         });
     }
 }

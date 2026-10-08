@@ -9,6 +9,8 @@ public static class ApiRoutes
     public const string Me = "api/me";
     public const string Modules = "api/modules";
     public const string Requests = "api/requests";
+    public const string Admin = "api/admin";
+    public const string Masters = "api/masters";
     public const string Lookups = "api/lookups";
     public const string Dashboard = "api/dashboard";
     public const string Team = "api/team";

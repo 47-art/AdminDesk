@@ -12,4 +12,15 @@ public static class AuditEventTypes
     public const string StepActivated = "StepActivated";
     public const string StepSkipped = "StepSkipped";
     public const string DefinitionSynced = "DefinitionSynced";
+    public const string DocumentUploaded = "DocumentUploaded";
+    public const string DocumentDownloaded = "DocumentDownloaded";
+    public const string DocumentRemoved = "DocumentRemoved";
+    public const string LimitChanged = "LimitChanged";
+    public const string ConditionChanged = "ConditionChanged";
+
+    // A request flow changed a master record (allocation, return, replacement).
+    public const string MasterUpdated = "MasterUpdated";
+
+    // An owner added, edited or retired a master record.
+    public const string MasterRecordChanged = "MasterRecordChanged";
 }

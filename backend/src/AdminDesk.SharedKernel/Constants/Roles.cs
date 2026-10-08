@@ -29,6 +29,18 @@ public static class Roles
     // belongs to the requester alone. Configuration is the SystemAdmin's and is separate from both.
     public static readonly string[] RequestOverride = { Admin };
 
+    // Action: roles that edit the limits and step conditions of a module, and view the configuration.
+    public static readonly string[] LimitEditors = { Management, SystemAdmin };
+
+    // Master records: who may add, edit and retire them, and who may look at them. Holder and
+    // status change only through the request flows.
+    public static readonly string[] SimMasterEditors = { Admin, Management };
+    public static readonly string[] AssetMasterEditors = { IT, Admin, Management };
+    public static readonly string[] IdCardMasterEditors = { HR, Admin, Management };
+    public static readonly string[] SimMasterViewers = { Admin, Management, SystemAdmin, IT };
+    public static readonly string[] AssetMasterViewers = { IT, Admin, Management, SystemAdmin };
+    public static readonly string[] IdCardMasterViewers = { HR, Admin, Management, SystemAdmin, IT };
+
     // Manager is derived from the reporting line, so it is never assigned directly.
     public static readonly string[] Assignable =
     {

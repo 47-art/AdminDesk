@@ -18,6 +18,11 @@ public static class ConfigKeys
     public const string JobsProvider = "Jobs:Provider";
     public const string SpikeEnabled = "Spike:Enabled";
     public const string DefinitionsOverrideDirectory = "Definitions:OverrideDirectory";
+    public const string DocumentsMaxBytes = "Documents:MaxBytes";
+    public const long DocumentsMaxBytesDefault = 5242880;
+
+    // Folder under the data directory that holds uploaded files.
+    public const string DocumentsFolderName = "documents";
     public const string DiagnosticsRunEngineProbe = "Diagnostics:RunEngineProbe";
 
     // Test-only trigger for the logging checks.
