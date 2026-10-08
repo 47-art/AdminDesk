@@ -54,16 +54,18 @@ builder.Host.UseSerilog((context, services, loggerConfiguration) =>
             retainedFileCountLimit: 14,
             shared: true);
 
-    foreach (var type in DiscoverTypes<ILogSinkContributor>(infrastructureAssembly))
+    var contributors = DiscoverInstances<ILogSinkContributor>(
+        (type, ex) => ReportSinkFailure($"Log sink contributor {type.Name} could not be configured", ex),
+        infrastructureAssembly);
+    foreach (var contributor in contributors)
     {
         try
         {
-            var contributor = (ILogSinkContributor)Activator.CreateInstance(type)!;
             contributor.Configure(loggerConfiguration, context.Configuration, ReportSinkFailure);
         }
         catch (Exception ex)
         {
-            ReportSinkFailure($"Log sink contributor {type.Name} could not be configured", ex);
+            ReportSinkFailure($"Log sink contributor {contributor.GetType().Name} could not be configured", ex);
         }
     }
 });
@@ -88,9 +90,6 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter(namingPolicy: null, allowIntegerValues: false));
 });
 
-builder.Services.AddAuthentication();
-builder.Services.AddAuthorization();
-
 var allowedOrigins = builder.Configuration.GetSection(ConfigKeys.CorsAllowedOrigins).Get<string[]>();
 if (allowedOrigins is null || allowedOrigins.Length == 0)
 {
@@ -109,15 +108,12 @@ builder.Services.AddCors(options =>
 builder.Services.AddValidatorsFromAssemblies(new[] { applicationAssembly, apiAssembly });
 builder.Services.AddSingleton<ICorrelationIdAccessor, AsyncLocalCorrelationIdAccessor>();
 
-foreach (var type in DiscoverTypes<IServiceModule>(infrastructureAssembly, apiAssembly))
+foreach (var module in DiscoverInstances<IServiceModule>(null, infrastructureAssembly, apiAssembly))
 {
-    var module = (IServiceModule)Activator.CreateInstance(type)!;
     module.ConfigureServices(builder.Services, builder.Configuration);
 }
 
-var pipelineModules = DiscoverTypes<IPipelineModule>(infrastructureAssembly, apiAssembly)
-    .Select(type => (IPipelineModule)Activator.CreateInstance(type)!)
-    .ToList();
+var pipelineModules = DiscoverInstances<IPipelineModule>(null, infrastructureAssembly, apiAssembly);
 
 try
 {
@@ -210,39 +206,42 @@ finally
     await Log.CloseAndFlushAsync();
 }
 
-// Public types of the given assemblies that implement T, created through a public
-// parameterless constructor, ordered by their Order value and then by type name.
-static List<Type> DiscoverTypes<T>(params Assembly[] assemblies)
+// One instance of each public type of the given assemblies that implements T and has a public
+// parameterless constructor, ordered by its Order value and then by type name. A type that cannot
+// be created is passed to onFailure and skipped; without onFailure the exception propagates.
+static List<T> DiscoverInstances<T>(Action<Type, Exception>? onFailure, params Assembly[] assemblies)
 {
-    var found = assemblies
+    var types = assemblies
         .SelectMany(a => a.GetTypes())
         .Where(t => typeof(T).IsAssignableFrom(t) && t is { IsAbstract: false, IsInterface: false } && t.GetConstructor(Type.EmptyTypes) != null)
-        .Distinct()
-        .Select(t => (Type: t, Order: OrderOf<T>(t)))
-        .OrderBy(x => x.Order)
-        .ThenBy(x => x.Type.FullName, StringComparer.Ordinal)
-        .Select(x => x.Type)
-        .ToList();
-    return found;
-}
+        .Distinct();
 
-static int OrderOf<T>(Type type)
-{
-    try
+    var created = new List<(T Instance, int Order, string Name)>();
+    foreach (var type in types)
     {
-        var instance = Activator.CreateInstance(type)!;
-        return instance switch
+        try
         {
-            IServiceModule m => m.Order,
-            IPipelineModule p => p.Order,
-            ILogSinkContributor c => c.Order,
-            _ => 0
-        };
+            var instance = (T)Activator.CreateInstance(type)!;
+            var order = instance switch
+            {
+                IServiceModule m => m.Order,
+                IPipelineModule p => p.Order,
+                ILogSinkContributor c => c.Order,
+                _ => 0
+            };
+            created.Add((instance, order, type.FullName ?? type.Name));
+        }
+        catch (Exception ex) when (onFailure is not null)
+        {
+            onFailure(type, ex);
+        }
     }
-    catch
-    {
-        return 0;
-    }
+
+    return created
+        .OrderBy(x => x.Order)
+        .ThenBy(x => x.Name, StringComparer.Ordinal)
+        .Select(x => x.Instance)
+        .ToList();
 }
 
 public partial class Program;
