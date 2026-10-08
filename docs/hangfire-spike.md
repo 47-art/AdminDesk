@@ -29,6 +29,10 @@ All background work goes through one scheduler interface; `Jobs:Provider` select
 | check3 | Restart survival: 60 s delayed job, whole process tree killed 8 s after scheduling, restarted after the due time on the same folder | fired 0 times before the kill, 1 time after restart | PASS |
 | check4 | 10-minute soak: 5 write jobs every 5 s, one warning log request per second (database log sink), health traffic | expected 600 probe rows, actual 605; forbidden-pattern matches (database is locked, SQLite Error 5, SQLITE_BUSY, AccessViolation, DistributedLockTimeout): 0; failed jobs: 0; log sink failures: 0; sink warning rows written: 514; process alive at the end | PASS |
 
+## Jobs dashboard
+
+The jobs dashboard is not part of this phase. The application does not map it, so `/hangfire` and `/hangfire/` answer 404 for anonymous callers and for every signed-in role. It arrives with the background-jobs work, so there is no dashboard check and no dashboard authorisation to document here. The Hangfire server and the scheduler interface stay in place.
+
 ## Verdict
 
 All four checks pass with Hangfire, so Hangfire stays the default provider. The timer-based provider remains available behind the same interface; it was verified to start and create its tables, but the soak was not run against it because the Hangfire checks passed.
