@@ -20,7 +20,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Waiting for me', path: ROUTE_PATHS.Inbox, icon: 'pi pi-inbox', roles: [], showsInboxCount: true },
   { label: 'My requests', path: ROUTE_PATHS.MyRequests, icon: 'pi pi-list', roles: [], requiresEmployeeProfile: true },
   { label: 'All requests', path: ROUTE_PATHS.AllRequests, icon: 'pi pi-list-check', roles: ROLE_GROUPS.OrganisationWide },
-  { label: 'Team requests', path: ROUTE_PATHS.TeamRequests, icon: 'pi pi-sitemap', roles: ROLE_GROUPS.RequestManagers, hiddenForRoles: ROLE_GROUPS.AdminRoles },
+  { label: 'Team requests', path: ROUTE_PATHS.TeamRequests, icon: 'pi pi-sitemap', roles: ROLE_GROUPS.RequestManagers, hiddenForRoles: ROLE_GROUPS.OrganisationWide },
   { label: 'New request', path: ROUTE_PATHS.NewRequest, icon: 'pi pi-plus-circle', roles: [], requiresEmployeeProfile: true },
   { label: 'People', path: ROUTE_PATHS.Team, icon: 'pi pi-users', roles: ROLE_GROUPS.Team },
 ];

@@ -23,7 +23,6 @@ export const ROLE_GROUPS = {
   /** Mirrors the server list of roles that see every request; keep the two in step. */
   OrganisationWide: [ROLES.Admin, ROLES.SystemAdmin, ROLES.Management],
   /** Manager is derived from the reporting line at sign-in, so the role answers "has direct reports". */
-  AdminRoles: [ROLES.Admin, ROLES.SystemAdmin],
   RequestManagers: [ROLES.Manager],
   /** Mirrors the server list of roles that may reject any request; keep the two in step. */
   RequestOverride: [ROLES.Admin],
