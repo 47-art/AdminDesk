@@ -20,4 +20,8 @@ export type Role = (typeof ROLES)[keyof typeof ROLES];
 export const ROLE_GROUPS = {
   Team: [ROLES.Manager, ROLES.Admin, ROLES.HR, ROLES.Management, ROLES.SystemAdmin],
   AuditViewers: [ROLES.Admin, ROLES.SystemAdmin],
+  /** Mirrors the server list of roles that see every request; keep the two in step. */
+  OrganisationWide: [ROLES.Admin, ROLES.SystemAdmin],
+  /** Manager is derived from the reporting line at sign-in, so the role answers "has direct reports". */
+  RequestManagers: [ROLES.Manager],
 } as const satisfies Record<string, readonly Role[]>;

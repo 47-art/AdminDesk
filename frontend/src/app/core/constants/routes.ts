@@ -3,6 +3,8 @@ export const ROUTE_PATHS = {
   Dashboard: 'dashboard',
   Inbox: 'inbox',
   MyRequests: 'requests',
+  AllRequests: 'all-requests',
+  TeamRequests: 'team-requests',
   NewRequest: 'new',
   RequestDetail: 'request',
   Team: 'team',

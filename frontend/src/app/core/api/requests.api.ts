@@ -48,8 +48,22 @@ export class RequestsApi {
   }
 
   mine(query: MineQuery = {}): Observable<Paged<RequestListItem>> {
+    return this.list('/api/requests/mine', query);
+  }
+
+  /** Every request in the organisation; the server allows only Admin and SystemAdmin. */
+  all(query: MineQuery = {}): Observable<Paged<RequestListItem>> {
+    return this.list('/api/requests/all', query);
+  }
+
+  /** Requests raised by the signed-in person's direct reports. */
+  team(query: MineQuery = {}): Observable<Paged<RequestListItem>> {
+    return this.list('/api/requests/team', query);
+  }
+
+  private list(path: string, query: MineQuery): Observable<Paged<RequestListItem>> {
     const { status, approvalStatus, ...rest } = query;
-    return this.api.get<Paged<RequestListItem>>('/api/requests/mine', {
+    return this.api.get<Paged<RequestListItem>>(path, {
       ...rest,
       status,
       approvalStatus,

@@ -13,7 +13,9 @@ import { Skeleton } from 'primeng/skeleton';
 import { TableLazyLoadEvent, TableModule } from 'primeng/table';
 import { Tooltip } from 'primeng/tooltip';
 
-import { ApprovalStatus, MineQuery, RequestListItem, RequestStatus } from '../../core/api/models';
+import { Observable } from 'rxjs';
+
+import { ApprovalStatus, MineQuery, Paged, RequestListItem, RequestStatus } from '../../core/api/models';
 import { ModulesApi } from '../../core/api/modules.api';
 import { RequestsApi } from '../../core/api/requests.api';
 import { ROUTE_PATHS } from '../../core/constants/routes';
@@ -53,6 +55,10 @@ interface ListState {
   pageSize: number;
 }
 
+function sourceOf(value: unknown): ListSource {
+  return value === 'all' || value === 'team' ? value : 'mine';
+}
+
 function positiveInt(value: string | null, fallback: number): number {
   const n = Number(value);
   return Number.isInteger(n) && n > 0 ? n : fallback;
@@ -79,7 +85,57 @@ function readState(params: ParamMap): ListState {
   };
 }
 
-/** Every request the signed-in user raised, with server-side search, filters, sorting and paging. */
+type ListSource = 'mine' | 'all' | 'team';
+
+interface SourceConfig {
+  heading: string;
+  errorText: string;
+  showNewRequest: boolean;
+  showRequester: boolean;
+  emptyIcon: string;
+  emptyTitle: string;
+  emptyBody: string;
+  /** Empty hides the button. */
+  emptyAction: string;
+}
+
+const SOURCES: Record<ListSource, SourceConfig> = {
+  mine: {
+    heading: 'My requests',
+    errorText: 'We could not load your requests. Try again.',
+    showNewRequest: true,
+    showRequester: false,
+    emptyIcon: 'pi-inbox',
+    emptyTitle: 'You have not raised any requests yet',
+    emptyBody: 'Start with a request type from the catalogue.',
+    emptyAction: 'Start a request',
+  },
+  all: {
+    heading: 'All requests',
+    errorText: 'We could not load all requests. Try again.',
+    showNewRequest: false,
+    showRequester: true,
+    emptyIcon: 'pi-inbox',
+    emptyTitle: 'No requests yet',
+    emptyBody: 'Requests raised by anyone in the organisation will appear here.',
+    emptyAction: '',
+  },
+  team: {
+    heading: 'Team requests',
+    errorText: 'We could not load team requests. Try again.',
+    showNewRequest: false,
+    showRequester: true,
+    emptyIcon: 'pi-users',
+    emptyTitle: 'No team requests yet',
+    emptyBody: 'Requests raised by people who report to you will appear here.',
+    emptyAction: '',
+  },
+};
+
+/**
+ * A server-paged request list with search, filters and sorting kept in the URL.
+ * Serves My requests, All requests and Team requests; the route data names the source.
+ */
 @Component({
   selector: 'app-my-requests-page',
   imports: [
@@ -195,8 +251,10 @@ function readState(params: ParamMap): ListState {
   `,
   template: `
     <div class="head">
-      <h1 class="text-heading">My requests</h1>
-      <button pButton type="button" icon="pi pi-plus" label="New request" [routerLink]="['/', paths.NewRequest]"></button>
+      <h1 class="text-heading">{{ config.heading }}</h1>
+      @if (config.showNewRequest) {
+        <button pButton type="button" icon="pi pi-plus" label="New request" [routerLink]="['/', paths.NewRequest]"></button>
+      }
     </div>
 
     @if (phone()) {
@@ -288,7 +346,7 @@ function readState(params: ParamMap): ListState {
 
     @if (failed()) {
       <div class="card error" role="alert">
-        <span>We could not load your requests. Try again.</span>
+        <span>{{ config.errorText }}</span>
         <button pButton type="button" severity="secondary" [outlined]="true" (click)="reload()">Try again</button>
       </div>
     } @else if (loading() && items().length === 0) {
@@ -308,10 +366,10 @@ function readState(params: ParamMap): ListState {
         />
       } @else {
         <app-empty-state
-          icon="pi-inbox"
-          title="You have not raised any requests yet"
-          body="Start with a request type from the catalogue."
-          actionLabel="Start a request"
+          [icon]="config.emptyIcon"
+          [title]="config.emptyTitle"
+          [body]="config.emptyBody"
+          [actionLabel]="config.emptyAction"
           (action)="startRequest()"
         />
       }
@@ -324,6 +382,9 @@ function readState(params: ParamMap): ListState {
               <app-status-badge [status]="row.currentStatus" />
             </div>
             <div>{{ row.subject }}</div>
+            @if (config.showRequester) {
+              <div class="secondary">{{ requesterLine(row) }}</div>
+            }
             <div class="secondary">{{ row.moduleName }}</div>
             <div class="secondary">Requested {{ date(row.requestDate) }}</div>
           </article>
@@ -351,7 +412,7 @@ function readState(params: ParamMap): ListState {
           [showCurrentPageReport]="true"
           currentPageReportTemplate="Showing {first} to {last} of {totalRecords}"
           [loading]="loading()"
-          aria-label="My requests"
+          [attr.aria-label]="config.heading"
           dataKey="id"
         >
           <ng-template #header>
@@ -361,6 +422,9 @@ function readState(params: ParamMap): ListState {
                   Request ID <i class="pi" [class]="sortIcon('requestNo')" aria-hidden="true"></i>
                 </button>
               </th>
+              @if (config.showRequester) {
+                <th scope="col">Requester</th>
+              }
               <th scope="col">Module</th>
               <th scope="col">Subject</th>
               <th scope="col" [attr.aria-sort]="ariaSort('requestDate')">
@@ -388,6 +452,14 @@ function readState(params: ParamMap): ListState {
               <td>
                 <a class="link" [routerLink]="detailLink(row)" (click)="$event.stopPropagation()">{{ row.requestNo }}</a>
               </td>
+              @if (config.showRequester) {
+                <td>
+                  {{ row.requesterName }}
+                  @if (row.requesterDepartment) {
+                    <div class="secondary">{{ row.requesterDepartment }}</div>
+                  }
+                </td>
+              }
               <td>{{ row.moduleName }}</td>
               <td>{{ row.subject }}</td>
               <td>{{ date(row.requestDate) }}</td>
@@ -416,6 +488,8 @@ export class MyRequestsPage implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly paths = ROUTE_PATHS;
+  protected readonly source: ListSource = sourceOf(this.route.snapshot.data['source']);
+  protected readonly config = SOURCES[this.source];
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = [1, 2, 3, 4, 5, 6, 7, 8];
   protected readonly statusOptions: Option<RequestStatus>[] = STATUS_SORT_ORDER.map((s) => ({
@@ -493,6 +567,10 @@ export class MyRequestsPage implements OnInit {
     return relativeTime(value);
   }
 
+  protected requesterLine(row: RequestListItem): string {
+    return row.requesterDepartment ? `${row.requesterName}, ${row.requesterDepartment}` : row.requesterName;
+  }
+
   protected detailLink(row: RequestListItem): unknown[] {
     return ['/', ROUTE_PATHS.RequestDetail, row.id];
   }
@@ -565,7 +643,7 @@ export class MyRequestsPage implements OnInit {
   protected loadMore(): void {
     const next = this.phonePage + 1;
     this.loading.set(true);
-    this.requestsApi.mine({ ...this.toQuery(this.state()), page: next, pageSize: DEFAULT_PAGE_SIZE }).subscribe({
+    this.fetch({ ...this.toQuery(this.state()), page: next, pageSize: DEFAULT_PAGE_SIZE }).subscribe({
       next: (result) => {
         this.phonePage = next;
         this.items.update((current) => [...current, ...result.items]);
@@ -612,6 +690,17 @@ export class MyRequestsPage implements OnInit {
     };
   }
 
+  private fetch(query: MineQuery): Observable<Paged<RequestListItem>> {
+    switch (this.source) {
+      case 'all':
+        return this.requestsApi.all(query);
+      case 'team':
+        return this.requestsApi.team(query);
+      default:
+        return this.requestsApi.mine(query);
+    }
+  }
+
   private load(): void {
     const s = this.state();
     this.loading.set(true);
@@ -619,7 +708,7 @@ export class MyRequestsPage implements OnInit {
     const phone = this.phone();
     this.phonePage = 1;
     const query = phone ? { ...this.toQuery(s), page: 1, pageSize: DEFAULT_PAGE_SIZE } : this.toQuery(s);
-    this.requestsApi.mine(query).subscribe({
+    this.fetch(query).subscribe({
       next: (result) => {
         this.items.set(result.items);
         this.total.set(result.total);

@@ -200,8 +200,9 @@ export class DashboardPage implements OnInit {
   }
 
   protected counters(data: DashboardSummary): Counter[] {
-    // Organisation-wide numbers would not match the My requests list, so those cards do not link.
-    const mine = data.scope === 'Organisation' ? null : `/${ROUTE_PATHS.MyRequests}`;
+    // Each card opens the list that holds exactly the requests it counts: all requests for the
+    // organisation scope, the signed-in person's own otherwise.
+    const mine = `/${data.scope === 'Organisation' ? ROUTE_PATHS.AllRequests : ROUTE_PATHS.MyRequests}`;
     return [
       { label: 'Waiting for me', value: data.waitingForMe, link: `/${ROUTE_PATHS.Inbox}`, query: null },
       { label: 'Total', value: data.total, link: mine, query: null },

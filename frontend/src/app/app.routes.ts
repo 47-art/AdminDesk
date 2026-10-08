@@ -29,6 +29,16 @@ export const routes: Routes = [
         loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.MY_REQUESTS_ROUTES),
       },
       {
+        path: ROUTE_PATHS.AllRequests,
+        canActivate: [roleGuard(ROLE_GROUPS.OrganisationWide)],
+        loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.ALL_REQUESTS_ROUTES),
+      },
+      {
+        path: ROUTE_PATHS.TeamRequests,
+        canActivate: [roleGuard(ROLE_GROUPS.RequestManagers)],
+        loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.TEAM_REQUESTS_ROUTES),
+      },
+      {
         path: ROUTE_PATHS.NewRequest,
         loadChildren: () => import('./features/new-request/new-request.routes').then((m) => m.NEW_REQUEST_ROUTES),
       },
