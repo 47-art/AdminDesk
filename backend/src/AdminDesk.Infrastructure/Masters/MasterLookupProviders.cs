@@ -61,19 +61,35 @@ public abstract class MasterItemLookupProvider : ILookupProvider
             ? $" AND t.status = '{_allocatedStatus}' AND t.holder_employee_id IS NOT NULL"
             : $" AND t.status = '{_availableStatus}'");
 
-    public async Task<IReadOnlyList<LookupItem>> SearchAsync(string q, int take, CancellationToken ct)
+    public Task<IReadOnlyList<LookupItem>> SearchAsync(string q, int take, CancellationToken ct) =>
+        SearchCoreAsync(q, take, null, ct);
+
+    // The held kinds show only what the caller holds; a caller without an employee record sees nothing.
+    public Task<IReadOnlyList<LookupItem>> SearchForActorAsync(string q, int take, long? actorEmployeeId, CancellationToken ct)
+    {
+        if (!_held)
+        {
+            return SearchCoreAsync(q, take, null, ct);
+        }
+        return actorEmployeeId is { } holder
+            ? SearchCoreAsync(q, take, holder, ct)
+            : Task.FromResult<IReadOnlyList<LookupItem>>(Array.Empty<LookupItem>());
+    }
+
+    private async Task<IReadOnlyList<LookupItem>> SearchCoreAsync(string q, int take, long? holderEmployeeId, CancellationToken ct)
     {
         var filtered = !string.IsNullOrEmpty(q);
         var search = filtered
             ? " AND (" + string.Join(" OR ", _searchColumns.Select(c => _dialect.Like("t." + c, "@Q"))) +
               (_held ? " OR " + _dialect.Like("e.full_name", "@Q") : string.Empty) + ")"
             : string.Empty;
-        var sql = Select + "WHERE " + Eligible + search + $" ORDER BY t.{_codeColumn}, t.id " + _dialect.LimitOffset("@Limit", "@Offset");
+        var holderFilter = holderEmployeeId is null ? string.Empty : " AND t.holder_employee_id = @Holder";
+        var sql = Select + "WHERE " + Eligible + holderFilter + search + $" ORDER BY t.{_codeColumn}, t.id " + _dialect.LimitOffset("@Limit", "@Offset");
 
         await using var connection = await _factory.OpenAsync(ct);
         var rows = await connection.QueryAsync<LookupRow>(new CommandDefinition(
             sql,
-            new { Q = filtered ? "%" + _dialect.EscapeLikeValue(q) + "%" : string.Empty, Limit = take, Offset = 0 },
+            new { Q = filtered ? "%" + _dialect.EscapeLikeValue(q) + "%" : string.Empty, Limit = take, Offset = 0, Holder = holderEmployeeId },
             cancellationToken: ct));
         return rows.Select(r => r.ToItem()).ToList();
     }

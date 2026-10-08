@@ -19,11 +19,11 @@ public sealed class MasterService : IMasterService
         _employees = employees;
     }
 
-    public async Task<IReadOnlyList<LookupItem>> SearchLookupAsync(string kind, string? q, int take, CancellationToken ct)
+    public async Task<IReadOnlyList<LookupItem>> SearchLookupAsync(string kind, string? q, int take, long? actorEmployeeId, CancellationToken ct)
     {
         var provider = _lookups.Find(kind) ?? throw new NotFoundException($"Unknown lookup '{kind}'.");
         var text = q?.Trim() ?? string.Empty;
-        return await provider.SearchAsync(text, Math.Clamp(take, 1, MaxLookupTake), ct);
+        return await provider.SearchForActorAsync(text, Math.Clamp(take, 1, MaxLookupTake), actorEmployeeId, ct);
     }
 
     public async Task<LookupItem> GetLookupAsync(string kind, long id, CancellationToken ct)

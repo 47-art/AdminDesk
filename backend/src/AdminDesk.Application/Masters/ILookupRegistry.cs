@@ -7,6 +7,11 @@ public interface ILookupProvider
 
     Task<IReadOnlyList<LookupItem>> SearchAsync(string q, int take, CancellationToken ct);
 
+    // Search on behalf of a signed-in person. Most kinds ignore the person; the held-item kinds list only what
+    // that person holds, and nothing when the caller has no employee record.
+    Task<IReadOnlyList<LookupItem>> SearchForActorAsync(string q, int take, long? actorEmployeeId, CancellationToken ct) =>
+        SearchAsync(q, take, ct);
+
     // The label of one item, whether or not it is still active.
     Task<LookupItem?> GetAsync(long id, CancellationToken ct);
 

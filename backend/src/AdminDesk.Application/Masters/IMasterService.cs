@@ -2,7 +2,9 @@ namespace AdminDesk.Application.Masters;
 
 public interface IMasterService
 {
-    Task<IReadOnlyList<LookupItem>> SearchLookupAsync(string kind, string? q, int take, CancellationToken ct);
+    // actorEmployeeId is the signed-in person's employee id (null when they have none); only the held-item
+    // kinds use it.
+    Task<IReadOnlyList<LookupItem>> SearchLookupAsync(string kind, string? q, int take, long? actorEmployeeId, CancellationToken ct);
 
     Task<LookupItem> GetLookupAsync(string kind, long id, CancellationToken ct);
 

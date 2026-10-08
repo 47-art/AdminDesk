@@ -204,6 +204,40 @@ internal sealed class EngineProbeMasterChecks
             }
         }
 
+        // The held kinds listed for a signed-in person show only the items that person holds, whatever their role.
+        foreach (var (kind, table) in new[] { (MasterLookupKinds.HeldAsset, "assets"), (MasterLookupKinds.HeldSim, "sims") })
+        {
+            var provider = _k.Lookups.Find(kind)!;
+            var adminId = (long)_k.Admin.EmployeeId!.Value;
+            var adminHeld = await _k.QueryAsync<long>($"SELECT id FROM {table} WHERE holder_employee_id = @A AND status = 'Allocated' AND is_active = 1", new { A = adminId });
+            var spare = await _k.ScalarAsync<long>($"SELECT MIN(id) FROM {table} WHERE status = 'Available' AND is_active = 1");
+            await _k.ExecuteRawAsync($"UPDATE {table} SET status = 'Allocated', holder_employee_id = {adminId} WHERE id = {spare}");
+            try
+            {
+                var demoOwn = (await provider.SearchForActorAsync(string.Empty, 200, _demo, ct)).Select(i => i.Id).OrderBy(i => i).ToList();
+                var demoExpected = (await _k.QueryAsync<long>($"SELECT id FROM {table} WHERE holder_employee_id = @D AND status = 'Allocated' AND is_active = 1", new { D = _demo })).OrderBy(i => i).ToList();
+                _k.Check(demoExpected.Count >= 1 && demoOwn.SequenceEqual(demoExpected), $"36: {kind} for the holder did not list exactly their own items");
+
+                var adminOwn = (await provider.SearchForActorAsync(string.Empty, 200, adminId, ct)).Select(i => i.Id).OrderBy(i => i).ToList();
+                var adminExpected = adminHeld.Append(spare).OrderBy(i => i).ToList();
+                _k.Check(adminOwn.SequenceEqual(adminExpected) && !adminOwn.Intersect(demoOwn).Any(), $"36: {kind} for the Admin did not list only their own items");
+
+                var otherEmployee = await _k.ScalarAsync<long>(
+                    $"SELECT MIN(e.id) FROM employees e WHERE e.is_active = 1 AND NOT EXISTS (SELECT 1 FROM {table} t WHERE t.holder_employee_id = e.id AND t.status = 'Allocated')");
+                _k.Check((await provider.SearchForActorAsync(string.Empty, 200, otherEmployee, ct)).Count == 0, $"36: {kind} for an employee who holds nothing listed items");
+                _k.Check((await provider.SearchForActorAsync(string.Empty, 200, null, ct)).Count == 0, $"36: {kind} for a caller without an employee record listed items");
+                _k.Check((await provider.SearchForActorAsync("no-such-item-zzz", 50, _demo, ct)).Count == 0, $"36: an empty {kind} search for a holder failed");
+                _k.Check((await provider.GetManyAsync(demoExpected.Concat(adminOwn).Distinct().ToArray(), ct)).Count == demoExpected.Concat(adminOwn).Distinct().Count(),
+                    $"36: labels of {kind} items held by others did not resolve");
+            }
+            finally
+            {
+                await _k.ExecuteRawAsync($"UPDATE {table} SET status = 'Available', holder_employee_id = NULL WHERE id = {spare}");
+            }
+        }
+        var unscopedAvailable = await _k.Lookups.Find(MasterLookupKinds.AvailableAsset)!.SearchForActorAsync(string.Empty, 200, null, ct);
+        _k.Check(unscopedAvailable.Count == availableAssets.Count, "36: the available asset lookup changed with the caller");
+
         // Labels still resolve for an item that was deactivated; search and validation skip it. A seeded row is
         // deactivated for the checks and switched back on afterwards.
         foreach (var (kind, table) in new[] { ("department", "departments"), ("location", "locations"), ("project", "projects"), ("employee", "employees") })

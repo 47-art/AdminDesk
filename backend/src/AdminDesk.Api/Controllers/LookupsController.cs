@@ -1,3 +1,4 @@
+using AdminDesk.Api.Auth;
 using AdminDesk.Application.Masters;
 using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Exceptions;
@@ -40,7 +41,7 @@ public class LookupsController : ControllerBase
     public async Task<ActionResult<ApiResponse<IReadOnlyList<LookupItem>>>> Search(
         string kind, [FromQuery] LookupQuery query, CancellationToken ct)
     {
-        var items = await _masters.SearchLookupAsync(kind, query.Q, query.Take, ct);
+        var items = await _masters.SearchLookupAsync(kind, query.Q, query.Take, User.EmployeeId(), ct);
         return Ok(ApiResponse<IReadOnlyList<LookupItem>>.Ok(items));
     }
 
