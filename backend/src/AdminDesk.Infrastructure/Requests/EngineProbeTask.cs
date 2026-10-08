@@ -969,8 +969,12 @@ internal sealed class CoreChecks
             () => _k.CreateAsync(_k.Requester, "stationery", new { item = "Pen", quantity = 1 }, null, 99999999));
         var earlier = await _k.QueryAsync<int>(
             "SELECT id FROM module_definitions WHERE code = 'stationery' AND version < (SELECT MAX(version) FROM module_definitions WHERE code = 'stationery')");
-        var definitionId = earlier.Count > 0 ? earlier[0] : checked((int)stationery.Id);
-        var accepted = await _k.CreateAsync(_k.Requester, "stationery", new { item = "Pen", quantity = 1 }, null, definitionId);
+        if (earlier.Count > 0)
+        {
+            await _k.ExpectFieldAsync("16: superseded definition version", "definitionId",
+                () => _k.CreateAsync(_k.Requester, "stationery", new { item = "Pen", quantity = 1 }, null, earlier[0]));
+        }
+        var accepted = await _k.CreateAsync(_k.Requester, "stationery", new { item = "Pen", quantity = 1 }, null, checked((int)stationery.Id));
         await _k.ActAsync(_k.Requester, accepted, RequestAction.Cancel, "ownership check done");
         _k.Pass("16 definition ownership");
 

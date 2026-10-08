@@ -181,7 +181,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         }
 
         var active = await _definitions.GetActiveAsync(issued.Definition.Code, ct);
-        if (active is null || issued.Definition.Version > active.Definition.Version)
+        if (active is null || issued.Definition.Version != active.Definition.Version)
         {
             throw stale;
         }
