@@ -99,6 +99,6 @@ public interface IRequestRepository
     Task<IReadOnlyList<ActorRow>> GetActiveActorsAsync(DbTransaction tx, long requestId, CancellationToken ct);
 
     // True for the requester, any past actor, any current actor (by employee id or role) and
-    // the SystemAdmin and Admin roles. False when the request does not exist.
+    // the organisation-wide roles (Admin, SystemAdmin and Management). False when the request does not exist.
     Task<bool> IsVisibleToAsync(long requestId, ActorContext actor, CancellationToken ct);
 }
