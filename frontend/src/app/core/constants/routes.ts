@@ -10,6 +10,7 @@ export const ROUTE_PATHS = {
   Team: 'team',
   LimitsConditions: 'limits',
   ModuleDefinitions: 'definitions',
+  Masters: 'masters',
   Forbidden: 'forbidden',
   NotFound: 'not-found',
 } as const;

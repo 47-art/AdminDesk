@@ -56,6 +56,11 @@ export const routes: Routes = [
         loadChildren: () => import('./features/admin-pages/admin-pages.routes').then((m) => m.TEAM_ROUTES),
       },
       {
+        path: ROUTE_PATHS.Masters,
+        canActivate: [roleGuard(ROLE_GROUPS.MasterViewers)],
+        loadChildren: () => import('./features/masters/masters.routes').then((m) => m.MASTERS_ROUTES),
+      },
+      {
         path: ROUTE_PATHS.LimitsConditions,
         canActivate: [roleGuard(ROLE_GROUPS.LimitEditors)],
         loadChildren: () => import('./features/admin-config/admin-config.routes').then((m) => m.LIMITS_ROUTES),

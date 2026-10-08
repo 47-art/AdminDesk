@@ -88,3 +88,38 @@ export const DEFAULT_ACTION_LABELS = {
   Approve: 'Approve',
   Complete: 'Complete',
 } as const;
+
+/** Status values of the SIM, asset and ID card masters. */
+export const MASTER_STATUSES = {
+  Available: 'Available',
+  Allocated: 'Allocated',
+  Damaged: 'Damaged',
+  Lost: 'Lost',
+  Deactivated: 'Deactivated',
+  Active: 'Active',
+  Replaced: 'Replaced',
+} as const;
+export type MasterStatus = (typeof MASTER_STATUSES)[keyof typeof MASTER_STATUSES];
+
+export const MASTER_STATUS_STYLES: Record<MasterStatus, StatusStyle> = {
+  Available: { label: 'Available', background: '#DDF3E4', text: '#17603A', icon: 'pi-check-circle' },
+  Allocated: { label: 'Allocated', background: '#DCE9F8', text: '#1F4E8C', icon: 'pi-user' },
+  Damaged: { label: 'Damaged', background: '#FDF0D0', text: '#7A4B00', icon: 'pi-exclamation-triangle' },
+  Lost: { label: 'Lost', background: '#FBE0E0', text: '#9B1C1C', icon: 'pi-times-circle' },
+  Deactivated: { label: 'Deactivated', background: '#E8ECF0', text: '#455363', icon: 'pi-ban' },
+  Active: { label: 'Active', background: '#DDF3E4', text: '#17603A', icon: 'pi-id-card' },
+  Replaced: { label: 'Replaced', background: '#E8ECF0', text: '#455363', icon: 'pi-replay' },
+};
+
+export const SIM_STATUS_OPTIONS: MasterStatus[] = [
+  MASTER_STATUSES.Available,
+  MASTER_STATUSES.Allocated,
+  MASTER_STATUSES.Deactivated,
+];
+export const ASSET_STATUS_OPTIONS: MasterStatus[] = [
+  MASTER_STATUSES.Available,
+  MASTER_STATUSES.Allocated,
+  MASTER_STATUSES.Damaged,
+  MASTER_STATUSES.Lost,
+];
+export const ID_CARD_STATUS_OPTIONS: MasterStatus[] = [MASTER_STATUSES.Active, MASTER_STATUSES.Replaced];
