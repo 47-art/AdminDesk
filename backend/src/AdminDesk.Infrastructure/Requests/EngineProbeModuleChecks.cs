@@ -326,7 +326,7 @@ internal sealed class EngineProbeModuleChecks
         await _k.ActAsync(_k.Requester, costly, RequestAction.Cancel, "Probe check finished");
 
         // Once IT has approved and the request waits for Finance, it leaves IT's waiting list and stays findable in
-        // the handled list; people who took no part do not get it.
+        // the handled list; people who only share a role with someone who acted, or took no part, do not get it.
         var handled = await _k.CreateAsync(_k.Requester, "laptop", new { assetType = "Desktop", requirement = "Design work", estimatedCost = 85000 });
         await DoAsync(_k.Manager, handled, "manager-approval", RequestAction.Approve);
         await DoAsync(_k.It, handled, "it-admin-verification", RequestAction.Approve);
@@ -339,7 +339,19 @@ internal sealed class EngineProbeModuleChecks
             _k.Check((await HandledIdsAsync(_k.It)).Contains(handled), "43: the request is missing from IT's handled list");
             _k.Check((await queries.GetDetailAsync(_k.It, handled, ct)).Id == handled, "43: IT cannot open the request it handled");
             _k.Check((await HandledIdsAsync(_k.Manager)).Contains(handled), "43: the manager who approved does not see the request as handled");
-            _k.Check((await HandledIdsAsync(_k.Finance)).Contains(handled), "43: Finance, assigned to the next step, does not see the request as handled");
+            _k.Check(!(await HandledIdsAsync(_k.Finance)).Contains(handled), "43: Finance, holding only the role of the next step, has the request in the handled list");
+            _k.Check((await queries.GetDetailAsync(_k.Finance, handled, ct)).Id == handled, "43: Finance cannot open the request while its step is active");
+            var otherIt = new ActorContext(_k.Uninvolved.UserId, _k.Uninvolved.Name, _k.Uninvolved.EmployeeId,
+                new HashSet<string> { Roles.Employee, Roles.IT });
+            _k.Check(!(await HandledIdsAsync(otherIt)).Contains(handled), "43: an IT user who did not act has the request in the handled list");
+            await _k.ExpectAsync<NotFoundException>("43: an IT user who did not act opening the request after the IT step", () => queries.GetDetailAsync(otherIt, handled, ct));
+            foreach (var who in new[] { _k.It, _k.Manager })
+            {
+                foreach (var id in await HandledIdsAsync(who))
+                {
+                    _k.Check((await queries.GetDetailAsync(who, id, ct)).Id == id, "43: a request in the handled list does not open for that user");
+                }
+            }
             _k.Check(!(await HandledIdsAsync(_k.Uninvolved)).Contains(handled), "43: an uninvolved employee has the request in the handled list");
             _k.Check(!(await HandledIdsAsync(_k.Requester)).Contains(handled), "43: the requester who never acted has the request in the handled list");
             await _k.ExpectAsync<NotFoundException>("43: an uninvolved employee opening the request", () => queries.GetDetailAsync(_k.Uninvolved, handled, ct));

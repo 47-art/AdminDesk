@@ -132,7 +132,7 @@ public interface IRequestQueryRepository
     // Every active request (organisation-wide).
     Task<PagedRows<RequestListRow>> ListAllAsync(MineFilter filter, CancellationToken ct);
 
-    // Requests the caller acted on or was assigned to act on at any step (employee or role), newest activity first.
+    // Requests the caller personally acted on or was named for by employee at any step, newest activity first.
     Task<PagedRows<RequestListRow>> ListHandledAsync(
         long? employeeId, string userId, IReadOnlyCollection<string> roles, MineFilter filter, CancellationToken ct);
 
