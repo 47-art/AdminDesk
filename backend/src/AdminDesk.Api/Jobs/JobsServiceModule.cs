@@ -50,6 +50,7 @@ public sealed class JobsServiceModule : IServiceModule
         }
 
         services.AddSingleton(new JobsProviderInfo(provider));
+        services.AddScoped<IStartupTask, JobsStartupTask>();
     }
 
     private static void ConfigureHangfire(IServiceCollection services, IConfiguration configuration)
