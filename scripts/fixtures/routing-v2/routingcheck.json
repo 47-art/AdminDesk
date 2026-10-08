@@ -1,0 +1,42 @@
+{
+  "code": "routingcheck",
+  "version": 2,
+  "name": "Routing check",
+  "description": "Sample definition that exercises a conditional step; load it through the override folder to try it.",
+  "category": "Visitors and others",
+  "icon": "pi-sitemap",
+  "prefix": "RTE",
+  "subject": "{title}",
+  "fields": [
+    { "key": "title", "label": "Title", "type": "text", "required": true, "maxLength": 60, "section": "Basics" },
+    { "key": "amount", "label": "Amount", "type": "money", "required": true, "min": 0, "section": "Basics" }
+  ],
+  "steps": [
+    { "key": "review", "name": "Review", "type": "approval", "actor": { "roles": ["Admin"] } },
+    {
+      "key": "inspection", "name": "Inspection", "type": "task", "actor": { "roles": ["Security"] },
+      "actionLabel": "Record inspection",
+      "captureFields": [
+        { "key": "damaged", "label": "Damaged", "type": "yesNo", "required": true }
+      ]
+    },
+    {
+      "key": "damage-assessment", "name": "Damage assessment", "type": "approval", "actor": { "roles": ["Finance"] },
+      "condition": { "field": "inspection.damaged", "op": "eq", "value": true }
+    },
+    {
+      "key": "high-value-approval", "name": "High value approval", "type": "approval", "actor": { "roles": ["Management"] },
+      "condition": { "field": "amount", "op": "gt", "limit": "amount-limit" }
+    },
+    {
+      "key": "extra-check", "name": "Extra check", "type": "task", "actor": { "roles": ["Security"] },
+      "actionLabel": "Confirm extra check",
+      "captureFields": [
+        { "key": "repairCost", "label": "Repair cost", "type": "money", "required": false }
+      ]
+    }
+  ],
+  "limits": [
+    { "stepKey": "high-value-approval", "limitKey": "amount-limit", "valueMinor": 5000000, "unit": "INR" }
+  ]
+}

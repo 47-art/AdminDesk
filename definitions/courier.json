@@ -1,0 +1,36 @@
+{
+  "code": "courier",
+  "version": 1,
+  "name": "Courier request",
+  "description": "Send a document or parcel by courier. Admin selects the courier, dispatches it and records the tracking number; the requester confirms delivery.",
+  "category": "Visitors and others",
+  "icon": "pi-send",
+  "prefix": "CUR",
+  "subject": "Courier to {receiverName}",
+  "fields": [
+    { "key": "documentDescription", "label": "Document or material", "type": "text", "required": true, "maxLength": 200, "section": "Document or material details" },
+    { "key": "senderName", "label": "Sender name", "type": "text", "required": true, "section": "Sender" },
+    { "key": "receiverName", "label": "Receiver name", "type": "text", "required": true, "section": "Receiver" },
+    { "key": "receiverAddress", "label": "Receiver address", "type": "longText", "required": true, "fullWidth": true, "section": "Address" },
+    { "key": "receiverCity", "label": "City", "type": "text", "required": true, "section": "Address" }
+  ],
+  "steps": [
+    {
+      "key": "courier-selection", "name": "Courier selection", "type": "task", "actor": { "roles": ["Admin"] },
+      "actionLabel": "Select courier",
+      "captureFields": [
+        { "key": "courierCompany", "label": "Courier company", "type": "text", "required": true, "maxLength": 80 }
+      ]
+    },
+    { "key": "dispatch", "name": "Dispatch", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Mark as dispatched" },
+    {
+      "key": "tracking-number", "name": "Tracking number", "type": "task", "actor": { "roles": ["Admin"] },
+      "actionLabel": "Save tracking number",
+      "captureFields": [
+        { "key": "trackingNumber", "label": "Tracking number", "type": "text", "required": true, "maxLength": 60 }
+      ]
+    },
+    { "key": "delivery-confirmation", "name": "Delivery confirmation", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm delivery" }
+  ],
+  "limits": []
+}

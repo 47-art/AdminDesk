@@ -1,0 +1,36 @@
+{
+  "code": "fieldcheck",
+  "version": 1,
+  "name": "Field type check",
+  "description": "Sample definition that uses every field type; load it through the override folder to try them all.",
+  "category": "Visitors and others",
+  "icon": "pi-list",
+  "prefix": "FLD",
+  "subject": "{title}",
+  "fields": [
+    { "key": "title", "label": "Title", "type": "text", "required": true, "maxLength": 60, "section": "Basics" },
+    { "key": "notes", "label": "Notes", "type": "longText", "fullWidth": true, "section": "Basics" },
+    { "key": "quantity", "label": "Quantity", "type": "number", "min": 1, "max": 10, "section": "Numbers" },
+    { "key": "amount", "label": "Amount", "type": "money", "min": 0, "section": "Numbers" },
+    { "key": "needBy", "label": "Need by", "type": "date", "section": "Dates" },
+    { "key": "startsAt", "label": "Starts at", "type": "dateTime", "section": "Dates" },
+    { "key": "urgent", "label": "Urgent", "type": "yesNo", "section": "Choices" },
+    {
+      "key": "kind", "label": "Kind", "type": "select", "section": "Choices",
+      "options": [ { "value": "a", "label": "A" }, { "value": "b", "label": "B" }, { "value": "c", "label": "C" } ]
+    },
+    {
+      "key": "tags", "label": "Tags", "type": "multiSelect", "fullWidth": true, "section": "Choices",
+      "options": [ { "value": "x", "label": "X" }, { "value": "y", "label": "Y" }, { "value": "z", "label": "Z" } ]
+    },
+    { "key": "assignee", "label": "Assignee", "type": "lookup", "lookupKind": "employee", "section": "Lookups" },
+    { "key": "ownerDepartment", "label": "Owner department", "type": "lookup", "lookupKind": "department", "section": "Lookups" },
+    { "key": "relatedProject", "label": "Related project", "type": "lookup", "lookupKind": "project", "section": "Lookups" },
+    { "key": "site", "label": "Site", "type": "lookup", "lookupKind": "location", "section": "Lookups" },
+    { "key": "chargeTo", "label": "Charge to", "type": "lookup", "lookupKind": "costCentre", "section": "Lookups" }
+  ],
+  "steps": [
+    { "key": "review", "name": "Review", "type": "approval", "actor": { "roles": ["Admin"] } }
+  ],
+  "limits": []
+}
