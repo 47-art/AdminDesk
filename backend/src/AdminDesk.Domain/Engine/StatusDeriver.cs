@@ -37,6 +37,11 @@ public static class TransitionRules
         return locking.Count > 0 && stepStates.Any(s => s.State == StepState.Done && locking.Contains(s.Key));
     }
 
+    // Segregation of duties: nobody approves or rejects their own request at an approval step, even
+    // when they hold the step's role. Task steps (fulfilment, confirmation) are not affected.
+    public static bool BarredAsRequester(StepType stepType, long? actorEmployeeId, long requesterEmployeeId) =>
+        stepType == StepType.Approval && actorEmployeeId is { } id && id == requesterEmployeeId;
+
     // Approve and reject belong to approval steps, complete to task steps. Cancel is not tied to a step.
     public static bool CanAct(StepType stepType, RequestAction action) => action switch
     {

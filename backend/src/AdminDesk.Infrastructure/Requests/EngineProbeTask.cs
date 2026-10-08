@@ -622,8 +622,10 @@ internal sealed class CoreChecks
         var verification = await _k.StepAsync(h, "verification");
         _k.Check(rh.CurrentStepKey == "verification" && verification.State == "Pending" && rh.ResponsibleRole == "Admin or Store",
             "8: verification was not left waiting for Admin or Store");
-        await _k.ActAsync(_k.Store, h, RequestAction.Approve);
-        _k.Check((await _k.RequestAsync(h)).CurrentStepKey == "stock-check", "8: the requester could not approve a step she holds the role for");
+        await _k.ExpectNotAllowedAsync("8: the requester approving her own request", () => _k.ActAsync(_k.Store, h, RequestAction.Approve));
+        await _k.ExpectNotAllowedAsync("8: the requester rejecting her own request", () => _k.ActAsync(_k.Store, h, RequestAction.Reject, "no"));
+        await _k.ActAsync(_k.Admin, h, RequestAction.Approve);
+        _k.Check((await _k.RequestAsync(h)).CurrentStepKey == "stock-check", "8: another holder of the role could not approve");
         await _k.ActAsync(_k.Store, h, RequestAction.Cancel, "test done");
         _k.Pass("8 no self-skip");
 

@@ -310,6 +310,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         var definitionStep = definition.Steps.First(s => s.Key == current.StepKey);
         var actors = await _requests.GetActiveActorsAsync(tx, request.Id, ct);
         var match = TransitionRules.CanAct(current.StepType, command.Action)
+            && !TransitionRules.BarredAsRequester(current.StepType, actor.EmployeeId, request.RequesterEmployeeId)
             ? actors.FirstOrDefault(a => a.StepSeq == current.Seq && Matches(a, actor))
             : null;
 

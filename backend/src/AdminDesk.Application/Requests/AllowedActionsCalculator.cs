@@ -28,7 +28,8 @@ public static class AllowedActionsCalculator
         var isActor = currentStepSeq is { } seq
             && activeActors.Any(a => a.StepSeq == seq && Matches(a, viewer));
 
-        if (isActor && currentStepType is { } type)
+        if (isActor && currentStepType is { } type
+            && !TransitionRules.BarredAsRequester(type, viewer.EmployeeId, requesterEmployeeId))
         {
             foreach (var action in new[] { RequestAction.Approve, RequestAction.Reject, RequestAction.Complete })
             {

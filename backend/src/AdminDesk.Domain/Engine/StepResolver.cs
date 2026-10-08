@@ -2,8 +2,8 @@ using AdminDesk.Domain.Definitions;
 
 namespace AdminDesk.Domain.Engine;
 
-// Names who may act on a step. The requester is never excluded: a requester who holds a
-// step's role may act on it. A reporting manager step with no manager yields no slot and
+// Names who may act on a step. A requester who holds a step's role may act on task steps, but
+// not approve or reject their own request (see TransitionRules.BarredAsRequester). A reporting manager step with no manager yields no slot and
 // the step waits.
 public static class StepResolver
 {
