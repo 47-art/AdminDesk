@@ -161,6 +161,7 @@ public sealed class EngineProbeTask : IStartupTask
             await new EngineProbeDocumentChecks(kit).RunAsync(ct);
             await new EngineProbeConfigChecks(kit).RunAsync(ct);
             await new EngineProbeMasterChecks(kit).RunAsync(ct);
+            await new EngineProbeModuleChecks(kit).RunAsync(ct);
             _logger.LogInformation("ENGINE PROBE PASSED ({Count} checks)", kit.Passed);
         }
         catch (Exception ex)
