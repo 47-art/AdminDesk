@@ -1,5 +1,6 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, inject, input, signal, viewChild } from '@angular/core';
 import { ButtonDirective } from 'primeng/button';
+import { Drawer } from 'primeng/drawer';
 import { TableModule } from 'primeng/table';
 
 import { AuditEventDto } from '../../core/api/models';
@@ -9,21 +10,16 @@ import { REQUEST_STATUS_STYLES, RequestStatus } from '../../core/constants/statu
 import { formatDateTime } from '../../shared/formatters/dates';
 import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.component';
 
-/** Read-only event history of a request. The page creates it only for the audit viewers: Admin, SystemAdmin and Management. */
+/**
+ * Button and right-hand drawer with the read-only event history of a request.
+ * The page creates it only for the audit viewers. Events are fetched when the drawer is first opened,
+ * and again on a later open only if the request has changed since.
+ */
 @Component({
-  selector: 'app-audit-trail-card',
-  imports: [TableModule, ButtonDirective, PageSkeletonComponent],
+  selector: 'app-audit-trail-drawer',
+  imports: [Drawer, TableModule, ButtonDirective, PageSkeletonComponent],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
-    .card {
-      background: #ffffff;
-      border: 1px solid var(--p-content-border-color);
-      border-radius: 8px;
-      padding: var(--space-lg);
-    }
-    h2 {
-      margin: 0 0 var(--space-md);
-    }
     .muted {
       color: var(--p-text-muted-color);
     }
@@ -38,8 +34,27 @@ import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.
     }
   `,
   template: `
-    <section class="card" aria-labelledby="audit-title">
-      <h2 id="audit-title" class="text-heading">Audit trail</h2>
+    <button
+      #trigger
+      pButton
+      type="button"
+      severity="secondary"
+      [outlined]="true"
+      icon="pi pi-history"
+      label="Audit trail"
+      aria-haspopup="dialog"
+      (click)="open()"
+    ></button>
+    <p-drawer
+      [visible]="visible()"
+      (visibleChange)="onVisibleChange($event)"
+      position="right"
+      header="Audit trail"
+      [modal]="true"
+      [dismissible]="true"
+      [closeOnEscape]="true"
+      [style]="{ width: 'min(960px, 100vw)' }"
+    >
       @if (loading()) {
         <app-page-skeleton preset="rows" />
       } @else if (failed()) {
@@ -77,35 +92,55 @@ import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.
           </ng-template>
         </p-table>
       }
-    </section>
+    </p-drawer>
   `,
 })
-export class AuditTrailCardComponent implements OnInit {
+export class AuditTrailDrawerComponent {
   readonly requestId = input.required<number>();
+  readonly rowVersion = input.required<number>();
 
   private readonly api = inject(RequestsApi);
+  private readonly trigger = viewChild.required<ElementRef<HTMLElement>>('trigger');
 
+  protected readonly visible = signal(false);
   protected readonly events = signal<AuditEventDto[]>([]);
-  protected readonly loading = signal(true);
+  protected readonly loading = signal(false);
   protected readonly failed = signal(false);
 
-  ngOnInit(): void {
-    this.load();
+  private loadedKey: string | null = null;
+
+  protected open(): void {
+    this.visible.set(true);
+    if (this.loadedKey !== this.key()) this.load();
+  }
+
+  protected onVisibleChange(open: boolean): void {
+    this.visible.set(open);
+    if (!open) setTimeout(() => this.trigger().nativeElement.focus());
   }
 
   protected load(): void {
+    const requestId = this.requestId();
+    const key = this.key();
     this.loading.set(true);
     this.failed.set(false);
-    this.api.audit(this.requestId()).subscribe({
+    this.api.audit(requestId).subscribe({
       next: (list) => {
+        if (requestId !== this.requestId()) return;
         this.events.set(list);
+        this.loadedKey = key;
         this.loading.set(false);
       },
       error: () => {
+        if (requestId !== this.requestId()) return;
         this.failed.set(true);
         this.loading.set(false);
       },
     });
+  }
+
+  private key(): string {
+    return `${this.requestId()}:${this.rowVersion()}`;
   }
 
   protected time(e: AuditEventDto): string {

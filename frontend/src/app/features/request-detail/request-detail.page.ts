@@ -13,7 +13,7 @@ import { NavigationHistoryService } from '../../core/navigation/navigation-histo
 import { ActionDialogComponent, DialogAction, RequestActionRunner } from '../../shared/action-dialog/action-dialog.component';
 import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.component';
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.component';
-import { AuditTrailCardComponent } from './audit-trail-card.component';
+import { AuditTrailDrawerComponent } from './audit-trail-drawer.component';
 import { DetailsCardComponent } from './details-card.component';
 import { StatusPanelComponent } from './status-panel.component';
 
@@ -27,7 +27,7 @@ import { StatusPanelComponent } from './status-panel.component';
     StatusBadgeComponent,
     DetailsCardComponent,
     StatusPanelComponent,
-    AuditTrailCardComponent,
+    AuditTrailDrawerComponent,
     ActionDialogComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -49,6 +49,9 @@ import { StatusPanelComponent } from './status-panel.component';
     }
     .title-row h1 {
       margin: 0;
+    }
+    .audit {
+      margin-left: auto;
     }
     .subject {
       margin: var(--space-xs) 0 0;
@@ -114,6 +117,9 @@ import { StatusPanelComponent } from './status-panel.component';
         <div class="title-row">
           <h1 class="text-heading">{{ d.requestNo }}</h1>
           <app-status-badge [status]="d.currentStatus" />
+          @if (showAudit()) {
+            <app-audit-trail-drawer class="audit" [requestId]="d.id" [rowVersion]="d.rowVersion" />
+          }
         </div>
         <p class="subject">{{ d.subject }}</p>
       </header>
@@ -121,11 +127,6 @@ import { StatusPanelComponent } from './status-panel.component';
         <div class="main">
           <app-details-card [detail]="d" />
           <div class="documents-slot" aria-hidden="true"></div>
-          @if (showAudit()) {
-            @for (version of [d.rowVersion]; track version) {
-              <app-audit-trail-card [requestId]="d.id" />
-            }
-          }
         </div>
         <aside class="side" aria-label="Status and timeline">
           <app-status-panel [detail]="d" [busy]="busy()" (action)="onAction(d, $event)" />
