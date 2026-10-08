@@ -51,7 +51,7 @@ interface Counter {
       flex-direction: column;
       gap: var(--space-xs);
       padding: var(--space-md);
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
       text-decoration: none;
@@ -81,7 +81,7 @@ interface Counter {
       margin: 0 0 var(--space-sm);
     }
     .card {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
     }

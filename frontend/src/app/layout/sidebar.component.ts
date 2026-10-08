@@ -15,7 +15,7 @@ import { NAV_ITEMS } from './nav-items';
   styles: `
     .rail {
       width: var(--sidebar-width);
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border-right: 1px solid var(--p-content-border-color, #d8e2ee);
       height: 100%;
       box-sizing: border-box;

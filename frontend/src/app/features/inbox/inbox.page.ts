@@ -83,7 +83,7 @@ interface Option<T> {
       min-width: 200px;
     }
     .card {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
     }
@@ -102,7 +102,7 @@ interface Option<T> {
       gap: var(--space-sm);
     }
     .req-card {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
       padding: var(--space-md);

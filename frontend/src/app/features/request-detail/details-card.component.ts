@@ -26,7 +26,7 @@ function row(label: string, value: string | null | undefined): Row {
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     .card {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
       padding: var(--space-lg);

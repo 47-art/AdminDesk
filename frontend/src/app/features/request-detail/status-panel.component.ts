@@ -23,7 +23,7 @@ const ACTION_ORDER: readonly RequestAction[] = ['Approve', 'Complete', 'Reject',
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     .panel {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
       padding: var(--space-lg);
@@ -77,7 +77,7 @@ const ACTION_ORDER: readonly RequestAction[] = ['Approve', 'Complete', 'Reject',
       gap: var(--space-sm);
       padding: var(--space-sm) var(--space-md);
       padding-bottom: calc(var(--space-sm) + env(safe-area-inset-bottom, 0px));
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border-top: 1px solid var(--p-content-border-color);
     }
     .dock button {

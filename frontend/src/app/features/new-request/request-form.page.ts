@@ -52,7 +52,7 @@ const TOP_BAR_OFFSET_PX = 72 + 16;
       margin: 0 0 var(--space-md);
     }
     .card {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
       padding: var(--space-lg);
@@ -69,7 +69,7 @@ const TOP_BAR_OFFSET_PX = 72 + 16;
       gap: var(--space-md);
       margin-top: var(--space-md);
       padding: var(--space-md);
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border-top: 1px solid var(--p-content-border-color);
       z-index: 5;
     }

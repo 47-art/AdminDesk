@@ -68,7 +68,7 @@ interface CategoryGroup {
       display: flex;
       gap: var(--space-md);
       padding: var(--space-md);
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
       color: inherit;

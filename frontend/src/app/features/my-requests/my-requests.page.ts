@@ -176,7 +176,7 @@ const SOURCES: Record<ListSource, SourceConfig> = {
       min-width: 180px;
     }
     .card {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
     }
@@ -213,7 +213,7 @@ const SOURCES: Record<ListSource, SourceConfig> = {
       gap: var(--space-sm);
     }
     .req-card {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
       padding: var(--space-md);

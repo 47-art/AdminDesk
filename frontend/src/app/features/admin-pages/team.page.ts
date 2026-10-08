@@ -30,7 +30,7 @@ const PAGE_SIZES = [10, 20, 50];
       margin-bottom: var(--space-md);
     }
     .card {
-      background: #ffffff;
+      background: var(--p-surface-0, #ffffff);
       border: 1px solid var(--p-content-border-color);
       border-radius: 8px;
     }
