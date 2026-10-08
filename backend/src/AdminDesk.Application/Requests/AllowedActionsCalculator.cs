@@ -44,18 +44,11 @@ public static class AllowedActionsCalculator
             allowed.Add(RequestAction.Cancel);
         }
 
-        // Admin and System admin may stop any in-progress request: reject at the current step, and
-        // cancel until the cancel lock. A request with no pending step cannot be rejected.
-        if (viewer.Roles.Overlaps(Roles.RequestOverride))
+        // The Admin may reject any in-progress request at its current step. A request with no pending
+        // step cannot be rejected. Cancel stays with the requester alone.
+        if (viewer.Roles.Overlaps(Roles.RequestOverride) && currentStepSeq is not null && !allowed.Contains(RequestAction.Reject))
         {
-            if (currentStepSeq is not null && !allowed.Contains(RequestAction.Reject))
-            {
-                allowed.Add(RequestAction.Reject);
-            }
-            if (!cancelLocked && !allowed.Contains(RequestAction.Cancel))
-            {
-                allowed.Add(RequestAction.Cancel);
-            }
+            allowed.Add(RequestAction.Reject);
         }
 
         return allowed;

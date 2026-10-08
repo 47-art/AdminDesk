@@ -51,7 +51,7 @@ export class RequestsApi {
     return this.list('/api/requests/mine', query);
   }
 
-  /** Every request in the organisation; the server allows only Admin and SystemAdmin. */
+  /** Every request in the organisation; the server allows Admin, SystemAdmin and Management (read-only). */
   all(query: MineQuery = {}): Observable<Paged<RequestListItem>> {
     return this.list('/api/requests/all', query);
   }

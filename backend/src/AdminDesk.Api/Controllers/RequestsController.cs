@@ -49,7 +49,7 @@ public class RequestsController : ControllerBase
     }
 
     [HttpGet("{id:long}/audit")]
-    [Authorize(Policy = Policies.AdminOrSystemAdmin)]
+    [Authorize(Policy = Policies.AuditViewers)]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<AuditEventDto>>>> Audit(long id, CancellationToken ct) =>
         Ok(ApiResponse<IReadOnlyList<AuditEventDto>>.Ok(await _queries.GetAuditAsync(_actors.Create(User), id, ct)));
 

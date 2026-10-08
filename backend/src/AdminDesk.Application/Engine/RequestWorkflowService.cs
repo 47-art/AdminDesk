@@ -26,7 +26,6 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
     private const int ReasonLimit = 1000;
     private const string RequesterLabel = "Requester";
     private const string ReportingManagerLabel = "Reporting manager";
-    private const string SystemAdminLabel = "System admin";
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRequestRepository _requests;
@@ -250,11 +249,11 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         DateTime now, CancellationToken ct)
     {
         var isRequester = actor.EmployeeId is not null && actor.EmployeeId == request.RequesterEmployeeId;
-        if (!(isRequester || IsOverride(actor)) || !TransitionRules.CanCancel(request.CurrentStatus))
+        if (!isRequester || !TransitionRules.CanCancel(request.CurrentStatus))
         {
             throw NotAllowed();
         }
-        var cancelRole = isRequester ? RequesterLabel : OverrideLabel(actor);
+        var cancelRole = RequesterLabel;
 
         var issued = await _definitions.GetByIdAsync(request.DefinitionId, ct)
             ?? throw new InvalidOperationException($"Definition {request.DefinitionId} of request {request.Id} is missing.");
@@ -308,11 +307,11 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
 
         if (match is null)
         {
-            // An Admin or System admin may reject the current step whatever its kind and whoever
+            // An Admin may reject the current step whatever its kind and whoever
             // it is assigned to; nobody else gets past this point.
             if (command.Action == RequestAction.Reject && IsOverride(actor))
             {
-                return await RejectAsync(connection, tx, actor, request, rows, current, OverrideLabel(actor), reason, now, ct);
+                return await RejectAsync(connection, tx, actor, request, rows, current, Roles.Admin, reason, now, ct);
             }
             throw NotAllowed();
         }
@@ -433,9 +432,6 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
     // ---------------------------------------------------------------- helpers
 
     private static bool IsOverride(ActorContext actor) => actor.Roles.Overlaps(Roles.RequestOverride);
-
-    private static string OverrideLabel(ActorContext actor) =>
-        actor.Roles.Contains(Roles.Admin) ? Roles.Admin : SystemAdminLabel;
 
     private static ForbiddenException NotAllowed() =>
         new("You cannot perform this action on this request.", ErrorCodes.ACTION_NOT_ALLOWED);

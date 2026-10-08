@@ -18,12 +18,16 @@ public static class Roles
         Employee, Manager, Admin, Finance, Management, HR, IT, Security, Store, SystemAdmin
     };
 
-    // Only these roles see every request in the organisation (dashboard counters and the All requests list).
-    public static readonly string[] OrganisationWide = { Admin, SystemAdmin };
+    // Visibility: these roles see every request in the organisation, read-only (dashboard counters,
+    // the All requests list and opening any request). Seeing a request grants no action on it.
+    public static readonly string[] OrganisationWide = { Admin, SystemAdmin, Management };
 
-    // Roles that may reject or cancel any in-progress request, whoever the approver or requester is.
-    // Deliberately separate from OrganisationWide, which only controls what a user can see.
-    public static readonly string[] RequestOverride = { Admin, SystemAdmin };
+    // Visibility: roles that may read the audit trail of a request.
+    public static readonly string[] AuditViewers = { Admin, SystemAdmin, Management };
+
+    // Action: only the Admin may reject an in-progress request whoever the approver is. Cancelling
+    // belongs to the requester alone. Configuration is the SystemAdmin's and is separate from both.
+    public static readonly string[] RequestOverride = { Admin };
 
     // Manager is derived from the reporting line, so it is never assigned directly.
     public static readonly string[] Assignable =

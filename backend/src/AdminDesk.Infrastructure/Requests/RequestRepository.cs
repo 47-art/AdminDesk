@@ -185,7 +185,7 @@ public sealed class RequestRepository : IRequestRepository
 
     public async Task<bool> IsVisibleToAsync(long requestId, ActorContext actor, CancellationToken ct)
     {
-        var privileged = actor.Roles.Contains(Roles.SystemAdmin) || actor.Roles.Contains(Roles.Admin);
+        var privileged = actor.Roles.Overlaps(Roles.OrganisationWide);
         var sql =
             "SELECT EXISTS (SELECT 1 FROM requests r WHERE r.id = @Id AND " + AuditSql.Active("r") + " AND (" +
             "@Privileged = 1 " +

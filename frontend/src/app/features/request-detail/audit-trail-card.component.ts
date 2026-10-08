@@ -9,7 +9,7 @@ import { REQUEST_STATUS_STYLES, RequestStatus } from '../../core/constants/statu
 import { formatDateTime } from '../../shared/formatters/dates';
 import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.component';
 
-/** Read-only event history of a request. The page creates it only for Admin and SystemAdmin. */
+/** Read-only event history of a request. The page creates it only for the audit viewers: Admin, SystemAdmin and Management. */
 @Component({
   selector: 'app-audit-trail-card',
   imports: [TableModule, ButtonDirective, PageSkeletonComponent],

@@ -175,7 +175,7 @@ public sealed class RequestQueryService : IRequestQueryService
 
     public async Task<IReadOnlyList<AuditEventDto>> GetAuditAsync(ActorContext actor, long id, CancellationToken ct)
     {
-        if (!actor.Roles.Contains(Roles.Admin) && !actor.Roles.Contains(Roles.SystemAdmin))
+        if (!actor.Roles.Overlaps(Roles.AuditViewers))
         {
             throw new ForbiddenException("You cannot read the audit trail.");
         }

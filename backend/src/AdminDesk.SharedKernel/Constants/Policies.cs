@@ -4,7 +4,7 @@ public static class Policies
 {
     public const string Authenticated = "Authenticated";
     public const string SystemAdminOnly = "SystemAdminOnly";
-    public const string AdminOrSystemAdmin = "AdminOrSystemAdmin";
+    public const string AuditViewers = "AuditViewers";
     public const string TeamViewers = "TeamViewers";
     public const string OrganisationWide = "OrganisationWide";
 
