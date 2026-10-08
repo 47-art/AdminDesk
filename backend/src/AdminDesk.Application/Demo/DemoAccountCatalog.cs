@@ -18,7 +18,7 @@ public static class DemoAccountCatalog
         new DemoAccount(Roles.Manager, "Rohan Kapoor", "manager@demo.test", "E0009",
             "Approves requests raised by direct reports and sees them under Team requests."),
         new DemoAccount(Roles.Admin, "Rahul Verma", "admin@demo.test", "E0005",
-            "Verifies stationery requests, handles courier dispatch, and sees every request and the audit trail."),
+            "Verifies stationery requests, handles courier dispatch, can reject any in-progress request, and sees every request and the audit trail."),
         new DemoAccount(Roles.Finance, "Anita Desai", "finance@demo.test", "E0002",
             "Raises and follows own requests; no steps are assigned to Finance in the current modules."),
         new DemoAccount(Roles.HR, "Suresh Iyer", "hr@demo.test", "E0003",
@@ -30,8 +30,8 @@ public static class DemoAccountCatalog
         new DemoAccount(Roles.Security, "Imran Sheikh", "security@demo.test", "E0007",
             "Raises and follows own requests; no steps are assigned to Security in the current modules."),
         new DemoAccount(Roles.Management, "Vikram Rao", "management@demo.test", "E0001",
-            "Approves high-value requests as limits are configured; a whole-operation view arrives in a later release."),
+            "Sees every request and the audit trail read-only; approves high-value requests as limits are configured."),
         new DemoAccount(Roles.SystemAdmin, "Neha Kulkarni", "sysadmin@demo.test", "E0008",
-            "Sees every request, the team directory and the audit trail of each request."),
+            "Technical role: configures workflow definitions, limits and background jobs as those screens arrive, with a read-only view of requests."),
     };
 }
