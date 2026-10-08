@@ -122,6 +122,8 @@ public sealed class DemoRequestSeedTask : IStartupTask
                 new Move(priya, RequestAction.Complete)
             }, ct);
 
+            await ServiceModulesAsync(priya, manager, admin, Ago, ct);
+
             // Requests from generated employees, waiting for the Manager.
             var managerEmployee = await _employees.GetByCodeAsync("E0009", ct);
             if (managerEmployee is not null)
@@ -149,6 +151,99 @@ public sealed class DemoRequestSeedTask : IStartupTask
             _logger.LogInformation("Demo requests created with status {Status}: {Count}", status, total);
         }
     }
+
+    // One request each for the allocation and service modules, left at a visible stage.
+    private async Task ServiceModulesAsync(ActorContext priya, ActorContext manager, ActorContext admin,
+        Func<int, int, DateTimeOffset> ago, CancellationToken ct)
+    {
+        long? sim;
+        long? location;
+        (long Id, long HolderId)? heldAsset;
+        await using (var connection = await _factory.OpenAsync(ct))
+        {
+            sim = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+                "SELECT id FROM sims WHERE status = 'Available' AND is_active = 1 AND deleted_utc IS NULL ORDER BY id LIMIT 1", cancellationToken: ct));
+            location = await connection.ExecuteScalarAsync<long?>(new CommandDefinition(
+                "SELECT id FROM locations WHERE is_active = 1 ORDER BY id LIMIT 1", cancellationToken: ct));
+            var held = await connection.QueryAsync<(long Id, long HolderId)>(new CommandDefinition(
+                "SELECT id AS Id, holder_employee_id AS HolderId FROM assets WHERE status = 'Allocated' AND holder_employee_id IS NOT NULL " +
+                "AND is_active = 1 AND deleted_utc IS NULL ORDER BY id LIMIT 1", cancellationToken: ct));
+            heldAsset = held.Select(h => ((long, long)?)h).FirstOrDefault();
+        }
+
+        // SIM waiting for the Admin verification, and one taken all the way to the master update.
+        await RunAsync("sim", priya, SimPayload("New SIM", "Field visits need a company number"), ago(2, 3),
+            new[] { new Move(manager, RequestAction.Approve) }, ct);
+        if (sim is not null)
+        {
+            await RunAsync("sim", priya, SimPayload("Replacement", "Old SIM stopped working"), ago(12, 0), new[]
+            {
+                new Move(manager, RequestAction.Approve),
+                new Move(admin, RequestAction.Approve),
+                new Move(admin, RequestAction.Complete),
+                new Move(admin, RequestAction.Complete, null, new() { ["sim"] = JsonSerializer.SerializeToElement(sim.Value) }),
+                new Move(priya, RequestAction.Complete),
+                new Move(admin, RequestAction.Complete, null, Captured("activationDate", DateTime.UtcNow.AddDays(-11).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture))),
+                new Move(admin, RequestAction.Complete)
+            }, ct);
+        }
+
+        // Laptop waiting for the IT or Admin verification.
+        await RunAsync("laptop", priya, new()
+        {
+            ["assetType"] = JsonSerializer.SerializeToElement("Laptop"),
+            ["requirement"] = JsonSerializer.SerializeToElement("Replacement for a laptop that is five years old")
+        }, ago(3, 4), new[] { new Move(manager, RequestAction.Approve) }, ct);
+
+        // Asset return at the condition check, raised by someone who holds an asset.
+        if (heldAsset is not null)
+        {
+            var code = await _employees.GetByIdAsync(heldAsset.Value.HolderId, ct);
+            if (code is not null)
+            {
+                var holder = await _actors.ForEmployeeAsync(code.Code, ct);
+                await RunAsync("asset-return", holder, new()
+                {
+                    ["asset"] = JsonSerializer.SerializeToElement(heldAsset.Value.Id),
+                    ["reason"] = JsonSerializer.SerializeToElement("Transfer")
+                }, ago(4, 0), new[] { new Move(admin, RequestAction.Approve) }, ct);
+            }
+        }
+
+        // ID card waiting for HR.
+        await RunAsync("id-card", priya, new()
+        {
+            ["requestType"] = JsonSerializer.SerializeToElement("Replacement"),
+            ["reason"] = JsonSerializer.SerializeToElement("Card was lost on a site visit"),
+            ["oldCardStatus"] = JsonSerializer.SerializeToElement("Lost")
+        }, ago(1, 6), Array.Empty<Move>(), ct);
+
+        // Welfare waiting for the Admin review.
+        await RunAsync("welfare", priya, new()
+        {
+            ["category"] = JsonSerializer.SerializeToElement("Medical camp arrangements"),
+            ["details"] = JsonSerializer.SerializeToElement("Annual health check camp for the office")
+        }, ago(2, 8), Array.Empty<Move>(), ct);
+
+        // Housekeeping waiting for assignment.
+        if (location is not null)
+        {
+            await RunAsync("housekeeping", priya, new()
+            {
+                ["location"] = JsonSerializer.SerializeToElement(location.Value),
+                ["area"] = JsonSerializer.SerializeToElement("Second floor"),
+                ["category"] = JsonSerializer.SerializeToElement("Washroom"),
+                ["description"] = JsonSerializer.SerializeToElement("Supplies in the washroom need refilling")
+            }, ago(0, 5), Array.Empty<Move>(), ct);
+        }
+    }
+
+    private static Dictionary<string, JsonElement> SimPayload(string type, string reason) =>
+        new()
+        {
+            ["requestType"] = JsonSerializer.SerializeToElement(type),
+            ["reason"] = JsonSerializer.SerializeToElement(reason)
+        };
 
     private static Dictionary<string, JsonElement> Captured(string key, string value) =>
         new() { [key] = JsonSerializer.SerializeToElement(value) };
