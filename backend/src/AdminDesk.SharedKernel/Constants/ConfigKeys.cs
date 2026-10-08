@@ -3,6 +3,9 @@ namespace AdminDesk.SharedKernel.Constants;
 public static class ConfigKeys
 {
     public const string DemoEnabled = "Demo:Enabled";
+
+    // Explicit opt-in that lets demo mode run when the environment is Production, for a public demo host.
+    public const string DemoAllowInProduction = "Demo:AllowInProduction";
     public const string JwtSigningKey = "Jwt:SigningKey";
     public const string JwtIssuer = "Jwt:Issuer";
     public const string JwtAudience = "Jwt:Audience";

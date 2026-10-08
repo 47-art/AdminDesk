@@ -138,7 +138,15 @@ try
 
     if (app.Configuration.GetValue<bool>(ConfigKeys.DemoEnabled) && app.Environment.IsProduction())
     {
-        app.Logger.LogWarning("Demo mode is enabled in a Production environment. Demo accounts and sample data must not be used outside a local demo.");
+        if (!app.Configuration.GetValue<bool>(ConfigKeys.DemoAllowInProduction))
+        {
+            // Demo mode publishes the demo accounts and their shared password; refuse to start
+            // rather than serve them from a Production host by accident.
+            throw new InvalidOperationException(
+                $"{ConfigKeys.DemoEnabled} is true in a Production environment. Turn demo mode off, or set " +
+                $"{ConfigKeys.DemoAllowInProduction} to true if this host is meant to be a public demo.");
+        }
+        app.Logger.LogWarning("Demo mode is enabled in a Production environment (explicitly allowed). Demo accounts and sample data are served to anyone who can reach this host.");
     }
 
     // Startup tasks run one at a time, each inside its own scope, before requests are accepted.
