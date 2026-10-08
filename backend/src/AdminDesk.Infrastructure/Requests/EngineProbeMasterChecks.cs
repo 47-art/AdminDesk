@@ -558,7 +558,30 @@ internal sealed class EngineProbeMasterChecks
         _k.Check(!(await _service.ListSimsAsync(1, 100, "PRB-SIM-1", null, null, ct)).Items.Any(s => s.Id == simAdmin.Id), "38: a retired SIM still appears in the list");
         _k.Check(!await _k.Lookups.Find(MasterLookupKinds.AvailableSim)!.ExistsAsync(simAdmin.Id, ct), "38: a retired SIM still validates in the lookup");
         await _k.ExpectAsync<ValidationException>("38: reusing the number of a retired SIM", () => _service.AddSimAsync(_k.Admin, Sim("PRB-SIM-1", "9100000004"), ct));
-        await _k.ExpectAsync<NotFoundException>("38: retiring a retired SIM", () => _service.RetireAsync(_k.Admin, MasterTypes.Sim, simAdmin.Id, ct));
+        var retireAgain = await _k.ExpectAsync<ConflictException>("38: retiring a retired SIM", () => _service.RetireAsync(_k.Admin, MasterTypes.Sim, simAdmin.Id, ct));
+        _k.Check(retireAgain.Message.Contains("retired"), "38: retiring a retired SIM does not say the record is retired");
+        var editRetired = await _k.ExpectAsync<ConflictException>("38: editing a retired SIM", () => _service.EditSimAsync(_k.Admin, simAdmin.Id, Sim("PRB-SIM-1", "9100000001"), ct));
+        _k.Check(editRetired.Message.Contains("retired"), "38: editing a retired SIM does not say the record is retired");
+
+        // Retired records are listed on request, for the editing roles only, and are tagged.
+        var editorRoles = new[] { _k.Admin.Roles, _k.Management.Roles };
+        foreach (var roles in editorRoles)
+        {
+            var withRetired = await _service.ListSimsAsync(1, 100, "PRB-SIM-1", null, null, ct, true, roles);
+            var row = withRetired.Items.SingleOrDefault(x => x.Id == simAdmin.Id);
+            _k.Check(row is not null && row.Retired && row.RetiredUtc is not null, "38: an editor does not see the retired SIM tagged as retired");
+        }
+        var plain = await _service.ListSimsAsync(1, 100, "PRB-SIM", null, null, ct, false, _k.Admin.Roles);
+        _k.Check(plain.Items.All(x => !x.Retired) && plain.Items.Any(x => x.Id == simManagement.Id), "38: the normal SIM list shows retired rows or hides active ones");
+        var mixed = await _service.ListSimsAsync(1, 100, "PRB-SIM", null, null, ct, true, _k.Admin.Roles);
+        _k.Check(mixed.Items.Any(x => x.Retired) && mixed.Items.Any(x => !x.Retired && x.Id == simManagement.Id), "38: the list with retired rows does not mix both kinds");
+        await _k.ExpectAsync<ForbiddenException>("38: IT listing retired SIMs", () => _service.ListSimsAsync(1, 10, null, null, null, ct, true, _k.It.Roles));
+        await _k.ExpectAsync<ForbiddenException>("38: SystemAdmin listing retired SIMs", () => _service.ListSimsAsync(1, 10, null, null, null, ct, true, _k.SysAdmin.Roles));
+        await _k.ExpectAsync<ForbiddenException>("38: HR listing retired assets", () => _service.ListAssetsAsync(1, 10, null, null, null, ct, true, _k.Hr.Roles));
+        await _k.ExpectAsync<ForbiddenException>("38: IT listing retired ID cards", () => _service.ListIdCardsAsync(1, 10, null, null, null, ct, true, _k.It.Roles));
+        await _k.ExpectAsync<ForbiddenException>("38: retired rows without a role", () => _service.ListSimsAsync(1, 10, null, null, null, ct, true, null));
+        var retiredHistory = await _service.GetHistoryAsync(MasterTypes.Sim, simAdmin.Id, ct);
+        _k.Check(retiredHistory.Count >= 2 && retiredHistory[0].EventType == MasterEvents.Retired, "38: the history of a retired SIM is not readable or lacks the retire event");
 
         var conflict = await _k.ExpectAsync<ConflictException>("38: retiring a held SIM", () => _service.RetireAsync(_k.Admin, MasterTypes.Sim, held.Id, ct));
         _k.Check(conflict.Code == ErrorCodes.STATE_CONFLICT, "38: retiring a held SIM gave the wrong code");
@@ -567,6 +590,21 @@ internal sealed class EngineProbeMasterChecks
         await _k.ExpectAsync<ForbiddenException>("38: IT retiring a SIM", () => _service.RetireAsync(_k.It, MasterTypes.Sim, simManagement.Id, ct));
         await _k.ExpectAsync<ForbiddenException>("38: HR retiring an asset", () => _service.RetireAsync(_k.Hr, MasterTypes.Asset, assetIt.Id, ct));
         await _service.RetireAsync(_k.It, MasterTypes.Asset, assetIt.Id, ct);
+        _k.Check((await _service.ListAssetsAsync(1, 50, "PRB-AST-1", null, null, ct, true, _k.It.Roles)).Items.Any(x => x.Id == assetIt.Id && x.Retired),
+            "38: IT does not see the retired asset when asking for retired rows");
+        _k.Check(!(await _service.ListAssetsAsync(1, 50, "PRB-AST-1", null, null, ct)).Items.Any(x => x.Id == assetIt.Id), "38: a retired asset appears in the normal list");
+        await _k.ExpectAsync<ConflictException>("38: editing a retired asset", () => _service.EditAssetAsync(_k.It, assetIt.Id,
+            new AssetFieldsBody { AssetTag = "PRB-AST-1", AssetType = "Laptop", MakeModel = "Probe Model 3", SerialNumber = "PRB-PRB-AST-1" }, ct));
+        await _k.ExpectAsync<ConflictException>("38: retiring a retired asset", () => _service.RetireAsync(_k.It, MasterTypes.Asset, assetIt.Id, ct));
+        _k.Check((await _service.GetHistoryAsync(MasterTypes.Asset, assetIt.Id, ct)).Count >= 1, "38: the history of a retired asset is not readable");
+        var cardRetire = await _service.AddIdCardAsync(_k.Hr, Card("PRB-IDC-R", free[3]), ct);
+        await _k.ExecuteRawAsync($"UPDATE id_cards SET status = 'Replaced' WHERE id = {cardRetire.Id}");
+        await _service.RetireAsync(_k.Hr, MasterTypes.IdCard, cardRetire.Id, ct);
+        _k.Check((await _service.ListIdCardsAsync(1, 50, "PRB-IDC-R", null, null, ct, true, _k.Hr.Roles)).Items.Any(x => x.Id == cardRetire.Id && x.Retired),
+            "38: HR does not see the retired ID card when asking for retired rows");
+        await _k.ExpectAsync<ConflictException>("38: editing a retired ID card", () => _service.EditIdCardAsync(_k.Hr, cardRetire.Id,
+            new IdCardEditBody { CardNumber = "PRB-IDC-R", IssuedDate = new DateOnly(2026, 2, 1) }, ct));
+        _k.Check((await _service.GetHistoryAsync(MasterTypes.IdCard, cardRetire.Id, ct)).Count >= 1, "38: the history of a retired ID card is not readable");
 
         // Audit rows with old and new values.
         var rows = await _k.QueryAsync<ProbeConfigAuditRow>(

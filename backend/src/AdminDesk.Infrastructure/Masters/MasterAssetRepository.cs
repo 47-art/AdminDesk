@@ -16,18 +16,21 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
     private const string SimSelect =
         "SELECT s.id AS Id, s.sim_number AS SimNumber, s.mobile_number AS MobileNumber, s.telecom_operator AS TelecomOperator, " +
         "s.plan AS Plan, s.activation_date AS ActivationDate, s.status AS Status, s.monthly_cost_minor AS MonthlyCostMinor, " +
-        "s.holder_employee_id AS HolderEmployeeId, e.full_name AS HolderName, e.employee_code AS HolderCode " +
+        "s.holder_employee_id AS HolderEmployeeId, e.full_name AS HolderName, e.employee_code AS HolderCode, " +
+        "s.deleted_utc AS RetiredUtc, CASE WHEN s.is_active = 1 AND s.deleted_utc IS NULL THEN 0 ELSE 1 END AS Retired " +
         "FROM sims s LEFT JOIN employees e ON e.id = s.holder_employee_id ";
 
     private const string AssetSelect =
         "SELECT a.id AS Id, a.asset_tag AS AssetTag, a.asset_type AS AssetType, a.make_model AS MakeModel, " +
         "a.serial_number AS SerialNumber, a.status AS Status, a.item_condition AS Condition, " +
-        "a.holder_employee_id AS HolderEmployeeId, e.full_name AS HolderName, e.employee_code AS HolderCode " +
+        "a.holder_employee_id AS HolderEmployeeId, e.full_name AS HolderName, e.employee_code AS HolderCode, " +
+        "a.deleted_utc AS RetiredUtc, CASE WHEN a.is_active = 1 AND a.deleted_utc IS NULL THEN 0 ELSE 1 END AS Retired " +
         "FROM assets a LEFT JOIN employees e ON e.id = a.holder_employee_id ";
 
     private const string CardSelect =
         "SELECT c.id AS Id, c.card_number AS CardNumber, c.employee_id AS EmployeeId, e.full_name AS EmployeeName, " +
-        "e.employee_code AS EmployeeCode, c.status AS Status, c.issued_date AS IssuedDate " +
+        "e.employee_code AS EmployeeCode, c.status AS Status, c.issued_date AS IssuedDate, " +
+        "c.deleted_utc AS RetiredUtc, CASE WHEN c.is_active = 1 AND c.deleted_utc IS NULL THEN 0 ELSE 1 END AS Retired " +
         "FROM id_cards c LEFT JOIN employees e ON e.id = c.employee_id ";
 
     private readonly IDbConnectionFactory _factory;
@@ -54,10 +57,48 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         public long? HolderEmployeeId { get; set; }
         public string? HolderName { get; set; }
         public string? HolderCode { get; set; }
+        public long Retired { get; set; }
+        public DateTime? RetiredUtc { get; set; }
 
         public SimDto ToDto() => new(
             Id, SimNumber, MobileNumber, TelecomOperator, Plan, ActivationDate, Status,
-            MoneyConverter.ToRupees(MonthlyCostMinor), HolderEmployeeId, HolderName, HolderCode);
+            MoneyConverter.ToRupees(MonthlyCostMinor), HolderEmployeeId, HolderName, HolderCode, Retired != 0, RetiredUtc);
+    }
+
+    private sealed class AssetRow
+    {
+        public long Id { get; set; }
+        public string AssetTag { get; set; } = string.Empty;
+        public string AssetType { get; set; } = string.Empty;
+        public string MakeModel { get; set; } = string.Empty;
+        public string SerialNumber { get; set; } = string.Empty;
+        public string Status { get; set; } = string.Empty;
+        public string? Condition { get; set; }
+        public long? HolderEmployeeId { get; set; }
+        public string? HolderName { get; set; }
+        public string? HolderCode { get; set; }
+        public long Retired { get; set; }
+        public DateTime? RetiredUtc { get; set; }
+
+        public AssetDto ToDto() => new(
+            Id, AssetTag, AssetType, MakeModel, SerialNumber, Status, Condition, HolderEmployeeId, HolderName, HolderCode,
+            Retired != 0, RetiredUtc);
+    }
+
+    private sealed class CardRow
+    {
+        public long Id { get; set; }
+        public string CardNumber { get; set; } = string.Empty;
+        public long EmployeeId { get; set; }
+        public string? EmployeeName { get; set; }
+        public string? EmployeeCode { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public DateOnly IssuedDate { get; set; }
+        public long Retired { get; set; }
+        public DateTime? RetiredUtc { get; set; }
+
+        public IdCardDto ToDto() => new(
+            Id, CardNumber, EmployeeId, EmployeeName, EmployeeCode, Status, IssuedDate, Retired != 0, RetiredUtc);
     }
 
     private sealed class HistoryRow
@@ -87,7 +128,7 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
     // A fragment of "AND ..." conditions shared by the three lists; the search columns are constants.
     private string Filters(MasterListQuery q, string alias, string[] searchColumns, DynamicParameters p)
     {
-        var sql = " AND " + AuditSql.Active(alias);
+        var sql = q.IncludeRetired ? string.Empty : " AND " + AuditSql.Active(alias);
         if (q.Status is not null)
         {
             sql += $" AND {alias}.status = @Status";
@@ -134,15 +175,21 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         return new PagedResult<SimDto>(page.Items.Select(r => r.ToDto()).ToList(), page.Total, page.Page, page.PageSize);
     }
 
-    public Task<PagedResult<AssetDto>> ListAssetsAsync(MasterListQuery query, CancellationToken ct) =>
-        PageAsync<AssetDto>(
+    public async Task<PagedResult<AssetDto>> ListAssetsAsync(MasterListQuery query, CancellationToken ct)
+    {
+        var page = await PageAsync<AssetRow>(
             AssetSelect, "FROM assets a LEFT JOIN employees e ON e.id = a.holder_employee_id", "a",
             new[] { "a.asset_tag", "a.asset_type", "a.make_model", "a.serial_number" }, "a.asset_tag, a.id", query, null, ct);
+        return new PagedResult<AssetDto>(page.Items.Select(r => r.ToDto()).ToList(), page.Total, page.Page, page.PageSize);
+    }
 
-    public Task<PagedResult<IdCardDto>> ListIdCardsAsync(MasterListQuery query, CancellationToken ct) =>
-        PageAsync<IdCardDto>(
+    public async Task<PagedResult<IdCardDto>> ListIdCardsAsync(MasterListQuery query, CancellationToken ct)
+    {
+        var page = await PageAsync<CardRow>(
             CardSelect, "FROM id_cards c LEFT JOIN employees e ON e.id = c.employee_id", "c",
             new[] { "c.card_number" }, "c.card_number, c.id", query, null, ct);
+        return new PagedResult<IdCardDto>(page.Items.Select(r => r.ToDto()).ToList(), page.Total, page.Page, page.PageSize);
+    }
 
     public async Task<IReadOnlyList<MasterHistoryDto>> GetHistoryAsync(string masterType, long id, CancellationToken ct)
     {
@@ -175,8 +222,26 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         }
         await using var connection = await _factory.OpenAsync(ct);
         return await connection.ExecuteScalarAsync<int>(new CommandDefinition(
-            "SELECT COUNT(*) FROM " + table + " t WHERE t.id = @Id AND " + AuditSql.Active("t"),
+            "SELECT COUNT(*) FROM " + table + " t WHERE t.id = @Id",
             new { Id = id }, cancellationToken: ct)) > 0;
+    }
+
+    public async Task<bool> IsRetiredAsync(DbTransaction tx, string masterType, long id, CancellationToken ct)
+    {
+        var table = masterType switch
+        {
+            MasterTypes.Sim => "sims",
+            MasterTypes.Asset => "assets",
+            MasterTypes.IdCard => "id_cards",
+            _ => null
+        };
+        if (table is null)
+        {
+            return false;
+        }
+        return await tx.Connection!.ExecuteScalarAsync<int>(new CommandDefinition(
+            "SELECT COUNT(*) FROM " + table + " t WHERE t.id = @Id AND NOT (" + AuditSql.Active("t") + ")",
+            new { Id = id }, tx, cancellationToken: ct)) > 0;
     }
 
     public async Task<HoldingsDto> ListHeldByAsync(long employeeId, CancellationToken ct)
@@ -212,13 +277,13 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         (await tx.Connection!.QueryFirstOrDefaultAsync<SimRow>(new CommandDefinition(
             SimSelect + "WHERE s.id = @Id AND " + AuditSql.Active("s"), new { Id = id }, tx, cancellationToken: ct)))?.ToDto();
 
-    public Task<AssetDto?> GetAssetAsync(DbTransaction tx, long id, CancellationToken ct) =>
-        tx.Connection!.QueryFirstOrDefaultAsync<AssetDto>(new CommandDefinition(
-            AssetSelect + "WHERE a.id = @Id AND " + AuditSql.Active("a"), new { Id = id }, tx, cancellationToken: ct));
+    public async Task<AssetDto?> GetAssetAsync(DbTransaction tx, long id, CancellationToken ct) =>
+        (await tx.Connection!.QueryFirstOrDefaultAsync<AssetRow>(new CommandDefinition(
+            AssetSelect + "WHERE a.id = @Id AND " + AuditSql.Active("a"), new { Id = id }, tx, cancellationToken: ct)))?.ToDto();
 
-    public Task<IdCardDto?> GetIdCardAsync(DbTransaction tx, long id, CancellationToken ct) =>
-        tx.Connection!.QueryFirstOrDefaultAsync<IdCardDto>(new CommandDefinition(
-            CardSelect + "WHERE c.id = @Id AND " + AuditSql.Active("c"), new { Id = id }, tx, cancellationToken: ct));
+    public async Task<IdCardDto?> GetIdCardAsync(DbTransaction tx, long id, CancellationToken ct) =>
+        (await tx.Connection!.QueryFirstOrDefaultAsync<CardRow>(new CommandDefinition(
+            CardSelect + "WHERE c.id = @Id AND " + AuditSql.Active("c"), new { Id = id }, tx, cancellationToken: ct)))?.ToDto();
 
     // Retired rows count: a number that was ever used stays reserved.
     public async Task<bool> IsNumberTakenAsync(

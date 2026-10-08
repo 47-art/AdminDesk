@@ -19,6 +19,9 @@ public sealed class MasterListParams
     public string? Status { get; set; }
 
     public long? Holder { get; set; }
+
+    // Also list retired records; only the roles that edit the master may ask for this.
+    public bool IncludeRetired { get; set; }
 }
 
 public sealed class MasterListParamsValidator : AbstractValidator<MasterListParams>
@@ -52,7 +55,7 @@ public class MastersController : ControllerBase
     [HttpGet(MasterTypes.SimRoute)]
     [Authorize(Policy = Policies.SimMasterViewers)]
     public async Task<ActionResult<ApiResponse<PagedResult<SimDto>>>> ListSims([FromQuery] MasterListParams q, CancellationToken ct) =>
-        Ok(ApiResponse<PagedResult<SimDto>>.Ok(await _masters.ListSimsAsync(q.Page, q.PageSize, q.Search, q.Status, q.Holder, ct)));
+        Ok(ApiResponse<PagedResult<SimDto>>.Ok(await _masters.ListSimsAsync(q.Page, q.PageSize, q.Search, q.Status, q.Holder, ct, q.IncludeRetired, User.RoleNames())));
 
     [HttpGet(MasterTypes.SimRoute + "/{id:long}/history")]
     [Authorize(Policy = Policies.SimMasterViewers)]
@@ -83,7 +86,7 @@ public class MastersController : ControllerBase
     [HttpGet(MasterTypes.AssetRoute)]
     [Authorize(Policy = Policies.AssetMasterViewers)]
     public async Task<ActionResult<ApiResponse<PagedResult<AssetDto>>>> ListAssets([FromQuery] MasterListParams q, CancellationToken ct) =>
-        Ok(ApiResponse<PagedResult<AssetDto>>.Ok(await _masters.ListAssetsAsync(q.Page, q.PageSize, q.Search, q.Status, q.Holder, ct)));
+        Ok(ApiResponse<PagedResult<AssetDto>>.Ok(await _masters.ListAssetsAsync(q.Page, q.PageSize, q.Search, q.Status, q.Holder, ct, q.IncludeRetired, User.RoleNames())));
 
     [HttpGet(MasterTypes.AssetRoute + "/{id:long}/history")]
     [Authorize(Policy = Policies.AssetMasterViewers)]
@@ -114,7 +117,7 @@ public class MastersController : ControllerBase
     [HttpGet(MasterTypes.IdCardRoute)]
     [Authorize(Policy = Policies.IdCardMasterViewers)]
     public async Task<ActionResult<ApiResponse<PagedResult<IdCardDto>>>> ListIdCards([FromQuery] MasterListParams q, CancellationToken ct) =>
-        Ok(ApiResponse<PagedResult<IdCardDto>>.Ok(await _masters.ListIdCardsAsync(q.Page, q.PageSize, q.Search, q.Status, q.Holder, ct)));
+        Ok(ApiResponse<PagedResult<IdCardDto>>.Ok(await _masters.ListIdCardsAsync(q.Page, q.PageSize, q.Search, q.Status, q.Holder, ct, q.IncludeRetired, User.RoleNames())));
 
     [HttpGet(MasterTypes.IdCardRoute + "/{id:long}/history")]
     [Authorize(Policy = Policies.IdCardMasterViewers)]

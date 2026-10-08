@@ -13,7 +13,9 @@ public sealed record SimDto(
     decimal MonthlyCost,
     long? HolderEmployeeId,
     string? HolderName,
-    string? HolderCode);
+    string? HolderCode,
+    bool Retired,
+    DateTime? RetiredUtc);
 
 public sealed record AssetDto(
     long Id,
@@ -25,7 +27,9 @@ public sealed record AssetDto(
     string? Condition,
     long? HolderEmployeeId,
     string? HolderName,
-    string? HolderCode);
+    string? HolderCode,
+    bool Retired,
+    DateTime? RetiredUtc);
 
 public sealed record IdCardDto(
     long Id,
@@ -34,7 +38,9 @@ public sealed record IdCardDto(
     string? EmployeeName,
     string? EmployeeCode,
     string Status,
-    DateOnly IssuedDate);
+    DateOnly IssuedDate,
+    bool Retired,
+    DateTime? RetiredUtc);
 
 public sealed record MasterHistoryDto(
     long Id,
@@ -54,7 +60,7 @@ public sealed record HoldingDto(string Type, long Id, string Label, string Since
 public sealed record HoldingsDto(IReadOnlyList<HoldingDto> Sims, IReadOnlyList<HoldingDto> Assets, HoldingDto? IdCard);
 
 // Page, filters and search of a master list.
-public sealed record MasterListQuery(int Page, int PageSize, string? Search, string? Status, long? HolderEmployeeId);
+public sealed record MasterListQuery(int Page, int PageSize, string? Search, string? Status, long? HolderEmployeeId, bool IncludeRetired = false);
 
 // Bodies of add and edit. Holder, status and condition are not part of them.
 public sealed class SimFieldsBody

@@ -36,7 +36,11 @@ public interface IMasterAssetRepository
 
     Task<IReadOnlyList<MasterHistoryDto>> GetHistoryAsync(string masterType, long id, CancellationToken ct);
 
+    // True for retired records too, so their history stays readable.
     Task<bool> ExistsAsync(string masterType, long id, CancellationToken ct);
+
+    // True when the record exists but has been retired.
+    Task<bool> IsRetiredAsync(DbTransaction tx, string masterType, long id, CancellationToken ct);
 
     // What the employee holds now, in one round trip.
     Task<HoldingsDto> ListHeldByAsync(long employeeId, CancellationToken ct);

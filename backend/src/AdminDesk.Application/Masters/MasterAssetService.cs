@@ -12,11 +12,17 @@ namespace AdminDesk.Application.Masters;
 
 public interface IMasterAssetService
 {
-    Task<PagedResult<SimDto>> ListSimsAsync(int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct);
+    Task<PagedResult<SimDto>> ListSimsAsync(
+        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct,
+        bool includeRetired = false, IReadOnlyCollection<string>? callerRoles = null);
 
-    Task<PagedResult<AssetDto>> ListAssetsAsync(int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct);
+    Task<PagedResult<AssetDto>> ListAssetsAsync(
+        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct,
+        bool includeRetired = false, IReadOnlyCollection<string>? callerRoles = null);
 
-    Task<PagedResult<IdCardDto>> ListIdCardsAsync(int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct);
+    Task<PagedResult<IdCardDto>> ListIdCardsAsync(
+        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct,
+        bool includeRetired = false, IReadOnlyCollection<string>? callerRoles = null);
 
     Task<IReadOnlyList<MasterHistoryDto>> GetHistoryAsync(string masterType, long id, CancellationToken ct);
 
@@ -70,16 +76,28 @@ public sealed class MasterAssetService : IMasterAssetService
     // ------------------------------------------------------------------ read
 
     public Task<PagedResult<SimDto>> ListSimsAsync(
-        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct) =>
-        _repository.ListSimsAsync(Query(page, pageSize, search, status, holder, SimStatuses.All), ct);
+        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct,
+        bool includeRetired = false, IReadOnlyCollection<string>? callerRoles = null)
+    {
+        RequireEditorToSeeRetired(includeRetired, callerRoles, MasterTypes.Sim);
+        return _repository.ListSimsAsync(Query(page, pageSize, search, status, holder, SimStatuses.All, includeRetired), ct);
+    }
 
     public Task<PagedResult<AssetDto>> ListAssetsAsync(
-        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct) =>
-        _repository.ListAssetsAsync(Query(page, pageSize, search, status, holder, AssetStatuses.All), ct);
+        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct,
+        bool includeRetired = false, IReadOnlyCollection<string>? callerRoles = null)
+    {
+        RequireEditorToSeeRetired(includeRetired, callerRoles, MasterTypes.Asset);
+        return _repository.ListAssetsAsync(Query(page, pageSize, search, status, holder, AssetStatuses.All, includeRetired), ct);
+    }
 
     public Task<PagedResult<IdCardDto>> ListIdCardsAsync(
-        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct) =>
-        _repository.ListIdCardsAsync(Query(page, pageSize, search, status, holder, IdCardStatuses.All), ct);
+        int page, int pageSize, string? search, string? status, long? holder, CancellationToken ct,
+        bool includeRetired = false, IReadOnlyCollection<string>? callerRoles = null)
+    {
+        RequireEditorToSeeRetired(includeRetired, callerRoles, MasterTypes.IdCard);
+        return _repository.ListIdCardsAsync(Query(page, pageSize, search, status, holder, IdCardStatuses.All, includeRetired), ct);
+    }
 
     public async Task<IReadOnlyList<MasterHistoryDto>> GetHistoryAsync(string masterType, long id, CancellationToken ct)
     {
@@ -93,8 +111,17 @@ public sealed class MasterAssetService : IMasterAssetService
     public Task<HoldingsDto> GetHoldingsAsync(long employeeId, CancellationToken ct) =>
         _repository.ListHeldByAsync(employeeId, ct);
 
+    // Retired records are listed only for the roles that may edit that master.
+    private static void RequireEditorToSeeRetired(bool includeRetired, IReadOnlyCollection<string>? callerRoles, string masterType)
+    {
+        if (includeRetired && (callerRoles is null || !EditorsOf(masterType).Any(callerRoles.Contains)))
+        {
+            throw new ForbiddenException("You are not allowed to see retired records.");
+        }
+    }
+
     private static MasterListQuery Query(
-        int page, int pageSize, string? search, string? status, long? holder, string[] allowedStatuses)
+        int page, int pageSize, string? search, string? status, long? holder, string[] allowedStatuses, bool includeRetired)
     {
         var text = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
         var chosen = string.IsNullOrWhiteSpace(status) ? null : status.Trim();
@@ -104,7 +131,7 @@ public sealed class MasterAssetService : IMasterAssetService
                 ?? throw new ValidationException("status", "Choose one of the listed statuses.");
         }
         return new MasterListQuery(
-            Math.Max(page, 1), Math.Clamp(pageSize, 1, MasterService.MaxPageSize), text, chosen, holder);
+            Math.Max(page, 1), Math.Clamp(pageSize, 1, MasterService.MaxPageSize), text, chosen, holder, includeRetired);
     }
 
     // ----------------------------------------------------------------- add
@@ -181,7 +208,7 @@ public sealed class MasterAssetService : IMasterAssetService
         _actorAccessor.Use(actor.UserId);
         return await _unitOfWork.ExecuteInTransactionAsync(async (_, tx) =>
         {
-            var before = await _repository.GetSimAsync(tx, id, ct) ?? throw NotFound();
+            var before = await _repository.GetSimAsync(tx, id, ct) ?? throw await MissingAsync(tx, MasterTypes.Sim, id, ct);
             await CheckSimNumbersAsync(tx, fields, id, ct);
             await _repository.UpdateSimAsync(tx, id, fields, ct);
             var after = await _repository.GetSimAsync(tx, id, ct) ?? throw NotFound();
@@ -198,7 +225,7 @@ public sealed class MasterAssetService : IMasterAssetService
         _actorAccessor.Use(actor.UserId);
         return await _unitOfWork.ExecuteInTransactionAsync(async (_, tx) =>
         {
-            var before = await _repository.GetAssetAsync(tx, id, ct) ?? throw NotFound();
+            var before = await _repository.GetAssetAsync(tx, id, ct) ?? throw await MissingAsync(tx, MasterTypes.Asset, id, ct);
             await CheckAssetNumbersAsync(tx, fields, id, ct);
             await _repository.UpdateAssetAsync(tx, id, fields, ct);
             var after = await _repository.GetAssetAsync(tx, id, ct) ?? throw NotFound();
@@ -216,7 +243,7 @@ public sealed class MasterAssetService : IMasterAssetService
         _actorAccessor.Use(actor.UserId);
         return await _unitOfWork.ExecuteInTransactionAsync(async (_, tx) =>
         {
-            var before = await _repository.GetIdCardAsync(tx, id, ct) ?? throw NotFound();
+            var before = await _repository.GetIdCardAsync(tx, id, ct) ?? throw await MissingAsync(tx, MasterTypes.IdCard, id, ct);
             if (await _repository.IsNumberTakenAsync(tx, MasterNumberKind.CardNumber, number, id, ct))
             {
                 throw new ValidationException("cardNumber", "This card number is already in use.");
@@ -249,19 +276,19 @@ public sealed class MasterAssetService : IMasterAssetService
             {
                 case MasterTypes.Sim:
                 {
-                    var sim = await _repository.GetSimAsync(tx, id, ct) ?? throw NotFound();
+                    var sim = await _repository.GetSimAsync(tx, id, ct) ?? throw await MissingAsync(tx, masterType, id, ct);
                     (label, before, held) = (sim.SimNumber, SimValues(sim), sim.HolderEmployeeId is not null);
                     break;
                 }
                 case MasterTypes.Asset:
                 {
-                    var asset = await _repository.GetAssetAsync(tx, id, ct) ?? throw NotFound();
+                    var asset = await _repository.GetAssetAsync(tx, id, ct) ?? throw await MissingAsync(tx, masterType, id, ct);
                     (label, before, held) = (asset.AssetTag, AssetValues(asset), asset.HolderEmployeeId is not null);
                     break;
                 }
                 default:
                 {
-                    var card = await _repository.GetIdCardAsync(tx, id, ct) ?? throw NotFound();
+                    var card = await _repository.GetIdCardAsync(tx, id, ct) ?? throw await MissingAsync(tx, masterType, id, ct);
                     (label, before, held) = (card.CardNumber, IdCardValues(card), card.Status == IdCardStatuses.Active);
                     break;
                 }
@@ -284,6 +311,12 @@ public sealed class MasterAssetService : IMasterAssetService
     // -------------------------------------------------------------- helpers
 
     private static NotFoundException NotFound() => new("This record was not found.");
+
+    // A record that is not found for a change is either unknown or already retired; retired ones say so.
+    private async Task<AppException> MissingAsync(System.Data.Common.DbTransaction tx, string masterType, long id, CancellationToken ct) =>
+        await _repository.IsRetiredAsync(tx, masterType, id, ct)
+            ? new ConflictException("This record is retired and can no longer be changed.")
+            : NotFound();
 
     private static string[] EditorsOf(string masterType) => masterType switch
     {
