@@ -30,12 +30,10 @@ public sealed class LookupQueryValidator : AbstractValidator<LookupQuery>
 public class LookupsController : ControllerBase
 {
     private readonly IMasterService _masters;
-    private readonly ILookupRegistry _registry;
 
-    public LookupsController(IMasterService masters, ILookupRegistry registry)
+    public LookupsController(IMasterService masters)
     {
         _masters = masters;
-        _registry = registry;
     }
 
     [HttpGet("{kind}")]
@@ -49,8 +47,7 @@ public class LookupsController : ControllerBase
     [HttpGet("{kind}/{id:long}")]
     public async Task<ActionResult<ApiResponse<LookupItem>>> Get(string kind, long id, CancellationToken ct)
     {
-        var provider = _registry.Find(kind) ?? throw new NotFoundException($"Unknown lookup '{kind}'.");
-        var item = await provider.GetAsync(id, ct) ?? throw new NotFoundException("Lookup item not found.");
+        var item = await _masters.GetLookupAsync(kind, id, ct);
         return Ok(ApiResponse<LookupItem>.Ok(item));
     }
 }

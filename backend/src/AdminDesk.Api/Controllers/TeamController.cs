@@ -32,8 +32,6 @@ public sealed class TeamQueryValidator : AbstractValidator<TeamQuery>
 [Route(ApiRoutes.Team)]
 public class TeamController : ControllerBase
 {
-    private static readonly string[] SeeEveryone = { Roles.Admin, Roles.HR, Roles.Management, Roles.SystemAdmin };
-
     private readonly IMasterService _masters;
 
     public TeamController(IMasterService masters)
@@ -44,17 +42,7 @@ public class TeamController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<ApiResponse<PagedResult<TeamMemberRow>>>> List([FromQuery] TeamQuery query, CancellationToken ct)
     {
-        var roles = User.RoleNames();
-        var employeeId = User.EmployeeId();
-
-        // Someone without an employee record who cannot see everyone has no team.
-        if (employeeId is null && !roles.Any(r => SeeEveryone.Contains(r)))
-        {
-            return Ok(ApiResponse<PagedResult<TeamMemberRow>>.Ok(
-                new PagedResult<TeamMemberRow>(Array.Empty<TeamMemberRow>(), 0, query.Page, query.PageSize)));
-        }
-
-        var page = await _masters.ListTeamAsync(employeeId ?? 0, roles, query.Q, query.Page, query.PageSize, ct);
+        var page = await _masters.ListTeamAsync(User.EmployeeId(), User.RoleNames(), query.Q, query.Page, query.PageSize, ct);
         return Ok(ApiResponse<PagedResult<TeamMemberRow>>.Ok(page));
     }
 }
