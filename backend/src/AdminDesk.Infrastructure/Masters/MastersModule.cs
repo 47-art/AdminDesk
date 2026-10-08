@@ -1,5 +1,6 @@
 using AdminDesk.Application.Abstractions;
 using AdminDesk.Application.Masters;
+using AdminDesk.Infrastructure.Seeding;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -21,5 +22,7 @@ public sealed class MastersModule : IServiceModule
         services.AddScoped<ILookupRegistry, LookupRegistry>();
 
         services.AddScoped<IMasterService, MasterService>();
+
+        services.AddScoped<IStartupTask, OrganisationSeedTask>();
     }
 }
