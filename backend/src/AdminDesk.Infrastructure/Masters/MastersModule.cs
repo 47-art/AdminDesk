@@ -19,10 +19,18 @@ public sealed class MastersModule : IServiceModule
         services.AddScoped<ILookupProvider, LocationLookupProvider>();
         services.AddScoped<ILookupProvider, ProjectLookupProvider>();
         services.AddScoped<ILookupProvider, CostCentreLookupProvider>();
+        services.AddScoped<ILookupProvider, AvailableSimLookupProvider>();
+        services.AddScoped<ILookupProvider, HeldSimLookupProvider>();
+        services.AddScoped<ILookupProvider, AvailableAssetLookupProvider>();
+        services.AddScoped<ILookupProvider, HeldAssetLookupProvider>();
         services.AddScoped<ILookupRegistry, LookupRegistry>();
 
         services.AddScoped<IMasterService, MasterService>();
 
+        services.AddScoped<IMasterAssetRepository, MasterAssetRepository>();
+        services.AddScoped<IMasterAssetService, MasterAssetService>();
+
         services.AddScoped<IStartupTask, OrganisationSeedTask>();
+        services.AddScoped<IStartupTask, AssetMasterSeedTask>();
     }
 }
