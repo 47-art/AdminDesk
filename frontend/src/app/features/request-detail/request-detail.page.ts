@@ -3,10 +3,12 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ButtonDirective } from 'primeng/button';
 
 import { ApiError } from '../../core/api/api-error';
-import { RequestDetail } from '../../core/api/models';
+import { FieldDto, RequestAction, RequestDetail } from '../../core/api/models';
 import { RequestsApi } from '../../core/api/requests.api';
 import { AuthService } from '../../core/auth/auth.service';
+import { BadgeCountsService } from '../../core/state/badge-counts.service';
 import { ROUTE_PATHS } from '../../core/constants/routes';
+import { ActionDialogComponent, DialogAction, RequestActionRunner } from '../../shared/action-dialog/action-dialog.component';
 import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.component';
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.component';
 import { AuditTrailCardComponent } from './audit-trail-card.component';
@@ -24,6 +26,7 @@ import { StatusPanelComponent } from './status-panel.component';
     DetailsCardComponent,
     StatusPanelComponent,
     AuditTrailCardComponent,
+    ActionDialogComponent,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
@@ -117,13 +120,26 @@ import { StatusPanelComponent } from './status-panel.component';
           <app-details-card [detail]="d" />
           <div class="documents-slot" aria-hidden="true"></div>
           @if (showAudit()) {
-            <app-audit-trail-card [requestId]="d.id" />
+            @for (version of [d.rowVersion]; track version) {
+              <app-audit-trail-card [requestId]="d.id" />
+            }
           }
         </div>
         <aside class="side" aria-label="Status and timeline">
-          <app-status-panel [detail]="d" />
+          <app-status-panel [detail]="d" [busy]="busy()" (action)="onAction(d, $event)" />
         </aside>
       </div>
+      <app-action-dialog
+        [(visible)]="dialogVisible"
+        [requestId]="d.id"
+        [requestNo]="d.requestNo"
+        [action]="dialogAction()"
+        [rowVersion]="d.rowVersion"
+        [captureFields]="dialogCaptureFields()"
+        [primaryActionLabel]="d.primaryActionLabel"
+        (completed)="afterChange($event)"
+        (conflict)="reload()"
+      />
     }
   `,
 })
@@ -132,12 +148,18 @@ export class RequestDetailPage implements OnInit {
   private readonly router = inject(Router);
   private readonly requests = inject(RequestsApi);
   private readonly auth = inject(AuthService);
+  private readonly runner = inject(RequestActionRunner);
+  private readonly badges = inject(BadgeCountsService);
 
   protected readonly mineRoute = ROUTE_PATHS.MyRequests;
   protected readonly detail = signal<RequestDetail | null>(null);
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
   protected readonly failed = signal(false);
+  protected readonly busy = signal(false);
+  protected readonly dialogVisible = signal(false);
+  protected readonly dialogAction = signal<DialogAction>('Reject');
+  protected readonly dialogCaptureFields = signal<FieldDto[]>([]);
   protected readonly showAudit = computed(() => this.auth.canSeeAudit());
 
   ngOnInit(): void {
@@ -168,6 +190,41 @@ export class RequestDetailPage implements OnInit {
         }
       },
     });
+  }
+
+  protected onAction(d: RequestDetail, action: RequestAction): void {
+    if (this.busy()) return;
+    if (action === 'Approve' || (action === 'Complete' && this.captureFieldsOf(d).length === 0)) {
+      this.busy.set(true);
+      this.runner.run(d.id, d.requestNo, action, d.rowVersion).subscribe((outcome) => {
+        this.busy.set(false);
+        if (outcome.kind === 'done') this.afterChange(outcome.detail);
+        else if (outcome.kind === 'conflict') this.reload();
+      });
+      return;
+    }
+    this.dialogAction.set(action as DialogAction);
+    this.dialogCaptureFields.set(action === 'Complete' ? this.captureFieldsOf(d) : []);
+    this.dialogVisible.set(true);
+  }
+
+  protected afterChange(updated: RequestDetail): void {
+    this.detail.set(updated);
+    this.badges.refreshInbox();
+  }
+
+  protected reload(): void {
+    const id = this.detail()?.id;
+    if (id === undefined) return;
+    this.requests.get(id).subscribe({
+      next: (d) => this.detail.set(d),
+      error: () => this.failed.set(true),
+    });
+    this.badges.refreshInbox();
+  }
+
+  private captureFieldsOf(d: RequestDetail): FieldDto[] {
+    return d.steps.find((s) => s.isCurrent)?.captureFields ?? [];
   }
 
   protected goToMine(): void {
