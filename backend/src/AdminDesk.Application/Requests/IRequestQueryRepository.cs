@@ -37,9 +37,13 @@ public sealed class RequestHeaderRow
     public DateTime? ClosedUtc { get; set; }
 }
 
-public sealed class CancelEventRow
+// The latest event that ended the request early: a rejection or a cancellation.
+public sealed class StopEventRow
 {
+    public string EventType { get; set; } = string.Empty;
     public string? Comment { get; set; }
+    public string? ActorName { get; set; }
+    public string? ActorRole { get; set; }
     public DateTime CreatedUtc { get; set; }
 }
 
@@ -48,7 +52,7 @@ public sealed class RequestDetailRows
     public RequestHeaderRow Header { get; set; } = new();
     public IReadOnlyList<RequestStepRow> Steps { get; set; } = Array.Empty<RequestStepRow>();
     public IReadOnlyList<ActorRow> ActiveActors { get; set; } = Array.Empty<ActorRow>();
-    public CancelEventRow? Cancelled { get; set; }
+    public StopEventRow? Stopped { get; set; }
 }
 
 public sealed class RequestListRow

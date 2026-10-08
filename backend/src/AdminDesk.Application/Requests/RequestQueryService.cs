@@ -119,10 +119,19 @@ public sealed class RequestQueryService : IRequestQueryService
 
         string? cancelReason = null;
         string? cancelledUtc = null;
-        if (status == RequestStatus.Cancelled && rows.Cancelled is { } cancelled)
+        string? stoppedByName = null;
+        string? stoppedByRole = null;
+        if (status == RequestStatus.Cancelled && rows.Stopped is { EventType: AuditEventTypes.Cancelled } cancelled)
         {
             cancelReason = cancelled.Comment;
             cancelledUtc = cancelled.CreatedUtc.ToUniversalTime().ToString(InstantFormat, CultureInfo.InvariantCulture);
+            stoppedByName = cancelled.ActorName;
+            stoppedByRole = cancelled.ActorRole;
+        }
+        else if (status == RequestStatus.Rejected && rows.Stopped is { EventType: AuditEventTypes.Rejected } rejected)
+        {
+            stoppedByName = rejected.ActorName;
+            stoppedByRole = rejected.ActorRole;
         }
 
         return new RequestDetailDto(
@@ -157,7 +166,9 @@ public sealed class RequestQueryService : IRequestQueryService
             allowed,
             primary,
             cancelReason,
-            cancelledUtc);
+            cancelledUtc,
+            stoppedByName,
+            stoppedByRole);
     }
 
     // ----------------------------------------------------------------- audit

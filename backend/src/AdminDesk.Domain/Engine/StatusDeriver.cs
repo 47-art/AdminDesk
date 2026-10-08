@@ -6,8 +6,9 @@ public static class StatusDeriver
 {
     // Closed requests are Approved. Otherwise the approval status is Pending while an
     // approval step is Pending, and Approved when none is (including a module with no
-    // approval step). An Upcoming step is undecided and is not counted. A rejection is
-    // recorded by the caller as Rejected/Rejected and a cancellation keeps the approval status.
+    // approval step). An Upcoming step is undecided and is not counted. A rejection, at an
+    // approval step or a task step and by anyone, is recorded by the caller as Rejected/Rejected, so
+    // a rejected request never counts as Approved or Pending; a cancellation keeps the approval status.
     public static (RequestStatus Status, ApprovalStatus Approval) Derive(IReadOnlyList<PlannedStep> steps, bool isClosed)
     {
         if (isClosed)

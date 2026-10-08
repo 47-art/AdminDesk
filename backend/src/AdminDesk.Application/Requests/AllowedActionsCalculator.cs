@@ -1,5 +1,6 @@
 using AdminDesk.Application.Engine;
 using AdminDesk.Domain.Engine;
+using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Enums;
 
 namespace AdminDesk.Application.Requests;
@@ -41,6 +42,20 @@ public static class AllowedActionsCalculator
         if (viewer.EmployeeId is { } employeeId && employeeId == requesterEmployeeId && TransitionRules.CanCancel(status) && !cancelLocked)
         {
             allowed.Add(RequestAction.Cancel);
+        }
+
+        // Admin and System admin may stop any in-progress request: reject at the current step, and
+        // cancel until the cancel lock. A request with no pending step cannot be rejected.
+        if (viewer.Roles.Overlaps(Roles.RequestOverride))
+        {
+            if (currentStepSeq is not null && !allowed.Contains(RequestAction.Reject))
+            {
+                allowed.Add(RequestAction.Reject);
+            }
+            if (!cancelLocked && !allowed.Contains(RequestAction.Cancel))
+            {
+                allowed.Add(RequestAction.Cancel);
+            }
         }
 
         return allowed;

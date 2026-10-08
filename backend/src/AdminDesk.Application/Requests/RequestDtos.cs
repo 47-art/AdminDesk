@@ -55,7 +55,9 @@ public sealed record RequestDetailDto(
     IReadOnlyList<RequestAction> AllowedActions,
     string? PrimaryActionLabel,
     string? CancelReason,
-    string? CancelledUtc);
+    string? CancelledUtc,
+    string? StoppedByName,
+    string? StoppedByRole);
 
 public sealed record RequestListItem(
     long Id,

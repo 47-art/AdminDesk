@@ -606,11 +606,154 @@ main_mode() {
 
   create "$T_EMP" "$(cur_body)"; C2=$RID
   detail "$C2" "$T_ADM"; RV=$(jget d.data.rowVersion)
-  act_rv "$C2" "$T_ADM" Reject "$RV" '"Not possible"'
-  assert_error "courier: admin Reject gets 403 (a task step has no Reject)" 403 ACTION_NOT_ALLOWED
+  act_rv "$C2" "$T_FIN" Reject "$RV" '"Not possible"'
+  assert_error "courier: non-admin Reject at a task step gets 403" 403 ACTION_NOT_ALLOWED
   act "$C2" "$T_EMP" Cancel '"No longer needed"'
   assert_status "courier: requester cancels at courier selection" 200
   assert_eq "courier: status Cancelled" "$(jget d.data.currentStatus)" Cancelled
+
+  # ------------------------------------------- admin and system admin may stop a request
+  # Reject at any step and Cancel until the cancel lock, each with a reason.
+  create "$T_EMP" "$(cur_body)"; G1=$RID
+  detail "$G1" "$T_ADM"; RV=$(jget d.data.rowVersion)
+  assert_eq "override: admin is offered Complete, Reject and Cancel at a task step" \
+    "$(jget 'd.data.allowedActions.slice().sort().join(",")')" "Cancel,Complete,Reject"
+  detail "$G1" "$T_SYS"
+  assert_eq "override: system admin is offered Reject and Cancel at a task step it does not hold" \
+    "$(jget 'd.data.allowedActions.slice().sort().join(",")')" "Cancel,Reject"
+  detail "$G1" "$T_MGR"
+  assert_eq "override: the manager is offered nothing" "$(jget 'd.data.allowedActions.length')" 0
+  detail "$G1" "$T_EMP"
+  assert_eq "override: the requester is offered only Cancel" "$(jget 'd.data.allowedActions.join(",")')" Cancel
+
+  # Everyone else is refused, and nothing is written.
+  detail "$G1" "$T_SYS"; RV=$(jget d.data.rowVersion)
+  for who in "Manager:$T_MGR" "Finance:$T_FIN" "HR:$T_HR" "Store:$T_STORE" "Security:$T_SEC" "Management:$T_MGT" "IT:$T_IT" "Requester:$T_EMP"; do
+    act_rv "$G1" "${who#*:}" Reject "$RV" '"Not for me"'
+    assert_error "override: ${who%%:*} Reject at a task step gets 403 ACTION_NOT_ALLOWED" 403 ACTION_NOT_ALLOWED
+  done
+  for who in "Manager:$T_MGR" "Finance:$T_FIN" "HR:$T_HR" "Store:$T_STORE" "Security:$T_SEC" "Management:$T_MGT" "IT:$T_IT"; do
+    act_rv "$G1" "${who#*:}" Cancel "$RV" '"Not mine"'
+    assert_error "override: ${who%%:*} Cancel of someone else's request gets 403 ACTION_NOT_ALLOWED" 403 ACTION_NOT_ALLOWED
+  done
+  create "$T_HR" "$(cur_body)"; G1B=$RID
+  detail "$G1B" "$T_SYS"; RVB=$(jget d.data.rowVersion)
+  act_rv "$G1B" "$T_EMP" Cancel "$RVB" '"Not mine"'
+  assert_error "override: an employee Cancel of another employee's request gets 403 ACTION_NOT_ALLOWED" 403 ACTION_NOT_ALLOWED
+  act_rv "$G1B" "$T_EMP" Reject "$RVB" '"Not mine"'
+  assert_error "override: an employee Reject of another employee's request gets 403 ACTION_NOT_ALLOWED" 403 ACTION_NOT_ALLOWED
+  detail "$G1" "$T_SYS"
+  assert_eq "override: refused calls leave the request unchanged" "$(jget d.data.currentStatus)/$(jget d.data.rowVersion)" "InProgress/$RV"
+
+  # The reason is checked first, then the version, then the role.
+  act_rv "$G1" "$T_ADM" Reject "$RV" '"   "'
+  assert_field_error "override: admin Reject without a reason gets 400" comment
+  act_rv "$G1" "$T_ADM" Cancel "$RV" null
+  assert_field_error "override: admin Cancel without a reason gets 400" comment
+  act_rv "$G1" "$T_ADM" Reject "$((RV + 1))" '"Stale"'
+  assert_error "override: admin Reject on a stale version gets 409" 409 STATE_CONFLICT
+
+  # Admin rejects at the courier selection step.
+  act_rv "$G1" "$T_ADM" Reject "$RV" '"Wrong courier chosen"'
+  assert_status "override: admin Reject at a task step" 200
+  detail "$G1" "$T_EMP"
+  assert_eq "override: status and approval status are both Rejected" "$(jget d.data.currentStatus)/$(jget d.data.approvalStatus)" "Rejected/Rejected"
+  assert_eq "override: the requester sees the reason on the step" "$(jget 'd.data.steps[0].comment')" "Wrong courier chosen"
+  assert_eq "override: the requester sees who rejected and in which role" "$(jget 'd.data.stoppedByName + "/" + d.data.stoppedByRole')" "Rahul Verma/Admin"
+  assert_eq "override: a rejected request offers the requester nothing" "$(jget 'd.data.allowedActions.length')" 0
+  detail "$G1" "$T_ADM"
+  assert_eq "override: a rejected request offers an admin nothing" "$(jget 'd.data.allowedActions.length')" 0
+  assert_eq "override: the step is marked Rejected with the admin's name" "$(jget 'd.data.steps[0].state + "/" + d.data.steps[0].actedByName')" "Rejected/Rahul Verma"
+  call GET "/api/requests/$G1/audit" "$T_ADM"
+  assert_eq "override: the audit trail records the admin, the role and the reason" \
+    "$(jget 'd.data.filter(e => e.eventType === "Rejected").map(e => e.actorName + "/" + e.actorRole + "/" + e.comment).join()')" "Rahul Verma/Admin/Wrong courier chosen"
+  act_rv "$G1" "$T_ADM" Reject "$((RV + 1))" '"Again"'
+  assert_error "override: a rejected request cannot be rejected again" 403 ACTION_NOT_ALLOWED
+  act_rv "$G1" "$T_SYS" Cancel "$((RV + 1))" '"Again"'
+  assert_error "override: a rejected request cannot be cancelled by a system admin" 403 ACTION_NOT_ALLOWED
+
+  # System admin rejects a Stationery request at a task step after the manager approved it.
+  create "$T_EMP" "$(stn_body Staplers 2)"; G2=$RID
+  act "$G2" "$T_MGR" Approve
+  act "$G2" "$T_STORE" Approve
+  detail "$G2" "$T_SYS"
+  assert_eq "override: the stationery request is at a task step" "$(jget 'd.data.currentStepKey')" stock-check
+  act "$G2" "$T_SYS" Reject '"Budget frozen"'
+  assert_status "override: system admin Reject at a task step" 200
+  detail "$G2" "$T_EMP"
+  assert_eq "override: the stationery request is Rejected/Rejected" "$(jget d.data.currentStatus)/$(jget d.data.approvalStatus)" "Rejected/Rejected"
+  assert_eq "override: the requester sees the system admin and the reason" \
+    "$(jget 'd.data.stoppedByName + "/" + d.data.stoppedByRole + "/" + d.data.steps.filter(s => s.state === "Rejected")[0].comment')" "Neha Kulkarni/System admin/Budget frozen"
+
+  # A manager still rejects as the approver.
+  create "$T_EMP" "$(stn_body Markers 2)"; G3=$RID
+  act "$G3" "$T_MGR" Reject '"Not needed"'
+  assert_status "override: the approving manager still rejects" 200
+  call GET "/api/requests/$G3/audit" "$T_ADM"
+  assert_eq "override: the manager's reject keeps the manager role" "$(jget 'd.data.filter(e => e.eventType === "Rejected")[0].actorRole')" "Reporting manager"
+
+  # Admin cancels before the lock.
+  create "$T_EMP" "$(cur_body)"; G4=$RID
+  act "$G4" "$T_ADM" Cancel '"Requester left the company"'
+  assert_status "override: admin Cancel before the lock" 200
+  detail "$G4" "$T_EMP"
+  assert_eq "override: status Cancelled" "$(jget d.data.currentStatus)" Cancelled
+  assert_eq "override: the cancel reason is stored" "$(jget d.data.cancelReason)" "Requester left the company"
+  assert_eq "override: the requester sees who cancelled and in which role" "$(jget 'd.data.stoppedByName + "/" + d.data.stoppedByRole')" "Rahul Verma/Admin"
+  assert_eq "override: a cancelled request offers nothing" "$(jget 'd.data.allowedActions.length')" 0
+  call GET "/api/requests/$G4/audit" "$T_ADM"
+  assert_eq "override: the audit trail records the admin cancel" \
+    "$(jget 'd.data.filter(e => e.eventType === "Cancelled").map(e => e.actorName + "/" + e.actorRole + "/" + e.comment).join()')" "Rahul Verma/Admin/Requester left the company"
+  create "$T_EMP" "$(stn_body Folders 1)"; G5=$RID
+  act "$G5" "$T_SYS" Cancel '"Duplicate request"'
+  assert_status "override: system admin Cancel before the lock" 200
+  call GET "/api/requests/$G5/audit" "$T_ADM"
+  assert_eq "override: the audit trail shows the System admin role" \
+    "$(jget 'd.data.filter(e => e.eventType === "Cancelled")[0].actorRole')" "System admin"
+
+  # The cancel lock holds for admins; Reject is never locked.
+  create "$T_EMP" "$(cur_body)"; G6=$RID
+  act "$G6" "$T_ADM" Complete null '{"courierCompany":"Example Couriers"}'
+  act "$G6" "$T_ADM" Complete
+  assert_status "override: the parcel is dispatched" 200
+  detail "$G6" "$T_ADM"; RV=$(jget d.data.rowVersion)
+  assert_eq "override: after dispatch admin is offered Reject but not Cancel" \
+    "$(jget 'd.data.allowedActions.slice().sort().join(",")')" "Complete,Reject"
+  detail "$G6" "$T_SYS"
+  assert_eq "override: after dispatch system admin is offered Reject only" "$(jget 'd.data.allowedActions.join(",")')" Reject
+  act_rv "$G6" "$T_ADM" Cancel "$RV" '"Too late"'
+  assert_error "override: admin Cancel after dispatch gets 422 CANCEL_LOCKED" 422 CANCEL_LOCKED
+  act_rv "$G6" "$T_SYS" Cancel "$RV" '"Too late"'
+  assert_error "override: system admin Cancel after dispatch gets 422 CANCEL_LOCKED" 422 CANCEL_LOCKED
+  detail "$G6" "$T_EMP"
+  assert_eq "override: the refused cancels leave the request unchanged" "$(jget d.data.currentStatus)/$(jget d.data.rowVersion)" "InProgress/$RV"
+  if [ -n "${DB_PATH-}" ]; then
+    assert_eq "override: the refused cancels wrote no Cancelled audit row" \
+      "$(dbval "SELECT COUNT(*) FROM audit_events WHERE request_id = $G6 AND event_type = 'Cancelled'")" 0
+  fi
+  act_rv "$G6" "$T_ADM" Reject "$RV" '"Parcel lost"'
+  assert_status "override: admin Reject after dispatch still works" 200
+  detail "$G6" "$T_EMP"
+  assert_eq "override: the dispatched request ends Rejected/Rejected" "$(jget d.data.currentStatus)/$(jget d.data.approvalStatus)" "Rejected/Rejected"
+
+  # The requester still cancels their own request.
+  create "$T_EMP" "$(cur_body)"; G7=$RID
+  act "$G7" "$T_EMP" Cancel '"Not needed"'
+  assert_status "override: the requester still cancels their own request" 200
+  call GET "/api/requests/$G7/audit" "$T_ADM"
+  assert_eq "override: the requester's cancel keeps the Requester label" "$(jget 'd.data.filter(e => e.eventType === "Cancelled")[0].actorRole')" Requester
+
+  # A request whose current step is not pending is refused and nothing changes.
+  if [ -n "${DB_PATH-}" ]; then
+    create "$T_EMP" "$(cur_body)"; G8=$RID
+    dbquery "$DB_PATH" "UPDATE request_steps SET state = 'Done' WHERE request_id = $G8 AND step_key = 'courier-selection'" >/dev/null 2>&1
+    detail "$G8" "$T_SYS"; RV=$(jget d.data.rowVersion)
+    act_rv "$G8" "$T_ADM" Reject "$RV" '"Odd state"'
+    assert_error "override: Reject on a request whose current step is not pending gets 403" 403 ACTION_NOT_ALLOWED
+    detail "$G8" "$T_SYS"
+    assert_eq "override: that refused Reject changed nothing" "$(jget d.data.currentStatus)/$(jget d.data.rowVersion)" "InProgress/$RV"
+    act_rv "$G8" "$T_ADM" Cancel "$RV" '"Tidy up"'
+  fi
 
   # ---------------------------------------------------------- cost centre
   call GET "/api/lookups/costCentre?take=1" "$T_EMP"

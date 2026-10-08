@@ -76,9 +76,10 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
         "SELECT a.id, a.request_id, a.step_seq, a.role_name, a.employee_id FROM request_step_actors a " +
         "WHERE a.request_id = @Id AND a.is_active = 1 ORDER BY a.step_seq, a.id";
 
-    private const string CancelSql =
-        "SELECT e.comment AS Comment, e.created_utc AS CreatedUtc FROM audit_events e " +
-        "WHERE e.request_id = @Id AND e.event_type = 'Cancelled' ORDER BY e.id DESC LIMIT 1";
+    private const string StopSql =
+        "SELECT e.event_type AS EventType, e.comment AS Comment, e.actor_name AS ActorName, e.actor_role AS ActorRole, " +
+        "e.created_utc AS CreatedUtc FROM audit_events e " +
+        "WHERE e.request_id = @Id AND e.event_type IN ('Cancelled', 'Rejected') ORDER BY e.id DESC LIMIT 1";
 
     private readonly IDbConnectionFactory _factory;
     private readonly ISqlDialect _dialect;
@@ -100,7 +101,7 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
 
     public async Task<RequestDetailRows?> GetDetailAsync(long id, CancellationToken ct)
     {
-        var sql = HeaderSql + "WHERE r.id = @Id AND " + AuditSql.Active("r") + "; " + StepsSql + "; " + ActorsSql + "; " + CancelSql;
+        var sql = HeaderSql + "WHERE r.id = @Id AND " + AuditSql.Active("r") + "; " + StepsSql + "; " + ActorsSql + "; " + StopSql;
 
         await using var connection = await _factory.OpenAsync(ct);
         using var grid = await connection.QueryMultipleAsync(new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));
@@ -108,13 +109,13 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
         var header = await grid.ReadSingleOrDefaultAsync<RequestHeaderRow>();
         var steps = (await grid.ReadAsync<RequestStepRow>()).ToList();
         var actors = (await grid.ReadAsync<ActorRow>()).ToList();
-        var cancelled = (await grid.ReadAsync<CancelEventRow>()).FirstOrDefault();
+        var stopped = (await grid.ReadAsync<StopEventRow>()).FirstOrDefault();
 
         if (header is null)
         {
             return null;
         }
-        return new RequestDetailRows { Header = header, Steps = steps, ActiveActors = actors, Cancelled = cancelled };
+        return new RequestDetailRows { Header = header, Steps = steps, ActiveActors = actors, Stopped = stopped };
     }
 
     // ------------------------------------------------------------------ mine

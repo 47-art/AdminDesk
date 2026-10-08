@@ -5,6 +5,7 @@ using AdminDesk.Application.Abstractions.Persistence;
 using AdminDesk.Application.Definitions;
 using AdminDesk.Application.Engine;
 using AdminDesk.Application.Masters;
+using AdminDesk.Application.Requests;
 using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Enums;
 using AdminDesk.SharedKernel.Exceptions;
@@ -210,6 +211,8 @@ internal sealed class ProbeKit
     public ActorContext Requester { get; private set; } = null!;
     public ActorContext Manager { get; private set; } = null!;
     public ActorContext Admin { get; private set; } = null!;
+    public ActorContext SysAdmin { get; private set; } = null!;
+    public ActorContext Hr { get; private set; } = null!;
     public ActorContext Store { get; private set; } = null!;
     public ActorContext Security { get; private set; } = null!;
     public ActorContext Management { get; private set; } = null!;
@@ -246,6 +249,8 @@ internal sealed class ProbeKit
         Requester = await ActorAsync("E0010", ct, Roles.Employee);
         Manager = await ActorAsync("E0009", ct, Roles.Employee);
         Admin = await ActorAsync("E0005", ct, Roles.Employee, Roles.Admin);
+        SysAdmin = await ActorAsync("E0008", ct, Roles.Employee, Roles.SystemAdmin);
+        Hr = await ActorAsync("E0003", ct, Roles.Employee, Roles.HR);
         Store = await ActorAsync("E0006", ct, Roles.Employee, Roles.Store);
         Security = await ActorAsync("E0007", ct, Roles.Employee, Roles.Security);
         Management = await ActorAsync("E0001", ct, Roles.Employee, Roles.Management);
@@ -574,7 +579,7 @@ internal sealed class CoreChecks
             () => _k.ActAsync(_k.Store, c, RequestAction.Complete, null, new Dictionary<string, JsonElement> { ["extra"] = ProbeKit.Json("x") }));
 
         // 7 cancel is locked once the material is issued (request c has passed the issue step)
-        await _k.ExpectNotAllowedAsync("7: cancel by a non-requester", () => _k.ActAsync(_k.Admin, c, RequestAction.Cancel, "not mine"));
+        await _k.ExpectNotAllowedAsync("7: cancel by a non-requester", () => _k.ActAsync(_k.Finance, c, RequestAction.Cancel, "not mine"));
         await _k.ExpectCancelLockedAsync("7: cancel after the material was issued", _k.Requester, c, "no longer needed");
         _k.Check((await _k.RequestAsync(c)).CurrentStatus == "InProgress", "7: the locked request is not in progress");
         await _k.ActAsync(_k.Store, c, RequestAction.Complete);
@@ -734,6 +739,140 @@ internal sealed class CoreChecks
         await _k.ActAsync(_k.Requester, e, RequestAction.Complete);
         _k.Check((await _k.RequestAsync(e)).CurrentStatus == "Closed", "7: the locked courier request could not be finished");
         _k.Pass("12 captured values");
+
+        await RunAdminOverrideAsync(courier);
+    }
+
+    // Admin and System admin may reject or cancel any in-progress request; nobody else may.
+    private async Task RunAdminOverrideAsync(object courier)
+    {
+        const string Company = "Example Couriers";
+        var stationery = new { item = "Pencil", quantity = 5 };
+
+        async Task<long> NewCourierAsync() => await _k.CreateAsync(_k.Requester, "courier", courier);
+        async Task<long> CourierAtDispatchAsync()
+        {
+            var id = await NewCourierAsync();
+            await _k.ActAsync(_k.Admin, id, RequestAction.Complete, null, new() { ["courierCompany"] = ProbeKit.Json(Company) });
+            return id;
+        }
+
+        // Admin rejects a Courier request at its task step: the reason is required first, then the version.
+        var r1 = await NewCourierAsync();
+        var versionBefore = (await _k.RequestAsync(r1)).RowVersion;
+        await _k.ExpectAsync<ValidationException>("13: admin reject without a reason", () => _k.ActAsync(_k.Admin, r1, RequestAction.Reject, "  "));
+        await _k.ExpectAsync<ConflictException>("13: admin reject on a stale version", () => _k.Service.ActAsync(_k.Admin, r1,
+            new ActionCommand { Action = RequestAction.Reject, Comment = "stale", ExpectedRowVersion = versionBefore - 1 }, default));
+        await _k.ActAsync(_k.Admin, r1, RequestAction.Reject, "  wrong courier  ");
+        var rr1 = await _k.RequestAsync(r1);
+        var step1 = await _k.StepAsync(r1, "courier-selection");
+        _k.Check(rr1.CurrentStatus == "Rejected" && rr1.ApprovalStatus == "Rejected" && rr1.RowVersion == versionBefore + 1
+            && rr1.ResponsibleEmployeeId is null && rr1.ResponsibleRole is null, "13: admin reject at a task step did not end the request as Rejected");
+        _k.Check(step1.State == "Rejected" && step1.Comment == "wrong courier" && step1.ActedByName == _k.Admin.Name, "13: the rejected step does not carry the reason and the admin");
+        _k.Check(await _k.ActiveActorCountAsync(r1) == 0, "13: actors were left active after the reject");
+        _k.Check(await _k.ScalarAsync<long>(
+            "SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Rejected' AND actor_role = 'Admin' AND comment = 'wrong courier' AND step_key = 'courier-selection'",
+            new { Id = r1 }) == 1, "13: the reject audit event is missing the admin role or the reason");
+
+        // A finished request offers nothing to anyone, including an admin.
+        var fingerprint = await _k.FingerprintAsync(r1);
+        await _k.ExpectNotAllowedAsync("13: reject a rejected request", () => _k.ActAsync(_k.Admin, r1, RequestAction.Reject, "again"));
+        await _k.ExpectNotAllowedAsync("13: cancel a rejected request", () => _k.ActAsync(_k.SysAdmin, r1, RequestAction.Cancel, "again"));
+        _k.Check(await _k.FingerprintAsync(r1) == fingerprint, "13: a refused action on a rejected request changed it");
+        foreach (var viewer in new[] { _k.Admin, _k.SysAdmin, _k.Requester })
+        {
+            _k.Check(AllowedActionsCalculator.Compute(viewer, RequestStatus.Rejected, _k.Requester.EmployeeId!.Value, null, null,
+                Array.Empty<ActorRow>()).Count == 0, "13: a rejected request offers actions");
+        }
+
+        // System admin rejects a Stationery request at a task step it does not hold.
+        var s1 = await _k.CreateAsync(_k.Requester, "stationery", stationery);
+        await _k.AdvanceStationeryAsync(s1, "stock-check");
+        _k.Check((await _k.RequestAsync(s1)).CurrentStepKey == "stock-check", "13: could not reach stock-check");
+        await _k.ActAsync(_k.SysAdmin, s1, RequestAction.Reject, "no stock budget");
+        var rs1 = await _k.RequestAsync(s1);
+        _k.Check(rs1.CurrentStatus == "Rejected" && rs1.ApprovalStatus == "Rejected", "13: system admin reject at a task step failed");
+        _k.Check(await _k.ScalarAsync<long>(
+            "SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Rejected' AND actor_role = 'System admin' AND actor_name = @Name",
+            new { Id = s1, _k.SysAdmin.Name }) == 1, "13: the reject audit event does not show the System admin role");
+
+        // A real approver still rejects under their own role label.
+        var s2 = await _k.CreateAsync(_k.Requester, "stationery", stationery);
+        await _k.ActAsync(_k.Manager, s2, RequestAction.Reject, "not needed");
+        _k.Check(await _k.ScalarAsync<long>(
+            "SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Rejected' AND actor_role = 'Reporting manager'", new { Id = s2 }) == 1,
+            "13: the manager reject lost its role label");
+
+        // Admin cancels before the lock; the approval status is kept.
+        var c1 = await NewCourierAsync();
+        await _k.ActAsync(_k.Admin, c1, RequestAction.Cancel, "  requester left  ");
+        var rc1 = await _k.RequestAsync(c1);
+        _k.Check(rc1.CurrentStatus == "Cancelled" && rc1.ApprovalStatus == "Approved" && await _k.ActiveActorCountAsync(c1) == 0, "13: admin cancel failed");
+        _k.Check(await _k.ScalarAsync<long>(
+            "SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Cancelled' AND actor_role = 'Admin' AND actor_name = @Name AND comment = 'requester left'",
+            new { Id = c1, _k.Admin.Name }) == 1, "13: the cancel audit event does not show the admin and the reason");
+
+        var c2 = await _k.CreateAsync(_k.Requester, "stationery", stationery);
+        await _k.ExpectAsync<ValidationException>("13: system admin cancel without a reason", () => _k.ActAsync(_k.SysAdmin, c2, RequestAction.Cancel, null));
+        await _k.ActAsync(_k.SysAdmin, c2, RequestAction.Cancel, "duplicate");
+        _k.Check(await _k.ScalarAsync<long>(
+            "SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Cancelled' AND actor_role = 'System admin'", new { Id = c2 }) == 1,
+            "13: the system admin cancel does not show the System admin role");
+
+        // The cancel lock holds for admins too; reject is never locked.
+        var locked = await CourierAtDispatchAsync();
+        await _k.ActAsync(_k.Admin, locked, RequestAction.Complete);
+        await _k.ExpectCancelLockedAsync("13: admin cancel after dispatch", _k.Admin, locked, "too late");
+        await _k.ExpectCancelLockedAsync("13: system admin cancel after dispatch", _k.SysAdmin, locked, "too late");
+        _k.Check(AllowedActionsCalculator.Compute(_k.SysAdmin, RequestStatus.InProgress, _k.Requester.EmployeeId!.Value, 3, StepType.Task,
+            Array.Empty<ActorRow>(), true).SequenceEqual(new[] { RequestAction.Reject }), "13: a locked request should offer an admin only Reject");
+        await _k.ActAsync(_k.Admin, locked, RequestAction.Reject, "parcel lost");
+        _k.Check((await _k.RequestAsync(locked)).CurrentStatus == "Rejected", "13: admin reject after the lock failed");
+
+        // Nobody else may reject at a task step or cancel somebody else's request, and nothing is written.
+        var target = await NewCourierAsync();
+        var untouched = await _k.FingerprintAsync(target);
+        var others = new (string Name, ActorContext Actor)[]
+        {
+            ("employee", _k.Uninvolved), ("manager", _k.Manager), ("finance", _k.Finance), ("hr", _k.Hr),
+            ("store", _k.Store), ("security", _k.Security), ("management", _k.Management)
+        };
+        foreach (var (name, actor) in others)
+        {
+            await _k.ExpectNotAllowedAsync($"13: {name} reject at a task step", () => _k.ActAsync(actor, target, RequestAction.Reject, "no"));
+            await _k.ExpectNotAllowedAsync($"13: {name} cancel of another person's request", () => _k.ActAsync(actor, target, RequestAction.Cancel, "no"));
+        }
+        _k.Check(await _k.FingerprintAsync(target) == untouched, "13: a refused call changed the request");
+
+        // allowedActions by role at a task step the viewer does not hold, then for the requester.
+        var requesterId = _k.Requester.EmployeeId!.Value;
+        IReadOnlyList<RequestAction> Offered(ActorContext viewer) => AllowedActionsCalculator.Compute(
+            viewer, RequestStatus.InProgress, requesterId, 2, StepType.Task, Array.Empty<ActorRow>());
+        foreach (var admin in new[] { _k.Admin, _k.SysAdmin })
+        {
+            _k.Check(Offered(admin).OrderBy(a => a).SequenceEqual(new[] { RequestAction.Reject, RequestAction.Cancel }.OrderBy(a => a)),
+                "13: an admin is not offered Reject and Cancel");
+        }
+        foreach (var (name, actor) in others)
+        {
+            _k.Check(Offered(actor).Count == 0, $"13: {name} is offered an action at a task step they do not hold");
+        }
+        _k.Check(Offered(_k.Requester).SequenceEqual(new[] { RequestAction.Cancel }), "13: the requester is not offered only Cancel");
+
+        // The requester still cancels their own request.
+        var own = await NewCourierAsync();
+        await _k.ActAsync(_k.Requester, own, RequestAction.Cancel, "not needed");
+        _k.Check(await _k.ScalarAsync<long>(
+            "SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Cancelled' AND actor_role = 'Requester'", new { Id = own }) == 1,
+            "13: the requester cancel lost its label");
+
+        // An inconsistent request (its current step is not pending) is refused and nothing is written.
+        var broken = await NewCourierAsync();
+        await _k.ExecuteRawAsync($"UPDATE request_steps SET state = 'Done' WHERE request_id = {broken} AND step_key = 'courier-selection'");
+        var brokenPrint = await _k.FingerprintAsync(broken);
+        await _k.ExpectNotAllowedAsync("13: admin reject when the current step is not pending", () => _k.ActAsync(_k.Admin, broken, RequestAction.Reject, "no"));
+        _k.Check(await _k.FingerprintAsync(broken) == brokenPrint, "13: the refused reject on an inconsistent request wrote something");
+        _k.Pass("13 admin and system admin override");
     }
 
     private async Task RunFieldTypesAsync()

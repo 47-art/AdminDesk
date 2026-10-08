@@ -21,6 +21,10 @@ public static class Roles
     // Only these roles see every request in the organisation (dashboard counters and the All requests list).
     public static readonly string[] OrganisationWide = { Admin, SystemAdmin };
 
+    // Roles that may reject or cancel any in-progress request, whoever the approver or requester is.
+    // Deliberately separate from OrganisationWide, which only controls what a user can see.
+    public static readonly string[] RequestOverride = { Admin, SystemAdmin };
+
     // Manager is derived from the reporting line, so it is never assigned directly.
     public static readonly string[] Assignable =
     {

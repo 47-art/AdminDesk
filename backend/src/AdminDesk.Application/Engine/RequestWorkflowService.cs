@@ -26,6 +26,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
     private const int ReasonLimit = 1000;
     private const string RequesterLabel = "Requester";
     private const string ReportingManagerLabel = "Reporting manager";
+    private const string SystemAdminLabel = "System admin";
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRequestRepository _requests;
@@ -248,10 +249,12 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         DbConnection connection, DbTransaction tx, ActorContext actor, RequestSnapshot request, string reason,
         DateTime now, CancellationToken ct)
     {
-        if (actor.EmployeeId != request.RequesterEmployeeId || !TransitionRules.CanCancel(request.CurrentStatus))
+        var isRequester = actor.EmployeeId is not null && actor.EmployeeId == request.RequesterEmployeeId;
+        if (!(isRequester || IsOverride(actor)) || !TransitionRules.CanCancel(request.CurrentStatus))
         {
             throw NotAllowed();
         }
+        var cancelRole = isRequester ? RequesterLabel : OverrideLabel(actor);
 
         var issued = await _definitions.GetByIdAsync(request.DefinitionId, ct)
             ?? throw new InvalidOperationException($"Definition {request.DefinitionId} of request {request.Id} is missing.");
@@ -270,7 +273,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
             ResponsibleRole = null
         };
         await PersistRequestAsync(tx, updated, request.RowVersion, ct);
-        await AppendAuditAsync(tx, request.Id, AuditEventTypes.Cancelled, actor.UserId, actor.Name, RequesterLabel,
+        await AppendAuditAsync(tx, request.Id, AuditEventTypes.Cancelled, actor.UserId, actor.Name, cancelRole,
             request.CurrentStepKey, request.CurrentStatus.ToString(), RequestStatus.Cancelled.ToString(), reason, null, now, ct);
 
         await RunTerminalHooksAsync(connection, tx, actor, updated with { RowVersion = request.RowVersion + 1 }, RequestStatus.Cancelled, ct);
@@ -292,16 +295,25 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
 
         var rows = (await _requests.GetStepsAsync(tx, request.Id, ct)).ToList();
         var current = rows.FirstOrDefault(r => r.Seq == request.CurrentStepSeq && r.State == StepState.Pending);
-        if (current is null || !TransitionRules.CanAct(current.StepType, command.Action))
+        if (current is null)
         {
             throw NotAllowed();
         }
 
         var definitionStep = definition.Steps.First(s => s.Key == current.StepKey);
         var actors = await _requests.GetActiveActorsAsync(tx, request.Id, ct);
-        var match = actors.FirstOrDefault(a => a.StepSeq == current.Seq && Matches(a, actor));
+        var match = TransitionRules.CanAct(current.StepType, command.Action)
+            ? actors.FirstOrDefault(a => a.StepSeq == current.Seq && Matches(a, actor))
+            : null;
+
         if (match is null)
         {
+            // An Admin or System admin may reject the current step whatever its kind and whoever
+            // it is assigned to; nobody else gets past this point.
+            if (command.Action == RequestAction.Reject && IsOverride(actor))
+            {
+                return await RejectAsync(connection, tx, actor, request, rows, current, OverrideLabel(actor), reason, now, ct);
+            }
             throw NotAllowed();
         }
         var actorRole = RoleLabel(match, definitionStep, request);
@@ -312,15 +324,19 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
             captured = await _validator.ValidateCapturedAsync(definitionStep.CaptureFields, command.Captured, ct);
         }
 
-        var rejected = command.Action == RequestAction.Reject;
+        if (command.Action == RequestAction.Reject)
+        {
+            return await RejectAsync(connection, tx, actor, request, rows, current, actorRole, reason, now, ct);
+        }
+
         var capturedJson = captured is { Count: > 0 } ? JsonSerializer.Serialize(captured) : null;
         var acted = current with
         {
-            State = rejected ? StepState.Rejected : StepState.Done,
+            State = StepState.Done,
             ActedByUserId = actor.UserId,
             ActedByName = actor.Name,
             ActedUtc = now,
-            Comment = rejected ? reason : null,
+            Comment = null,
             CapturedJson = capturedJson
         };
         await _requests.UpdateStepAsync(tx, acted, ct);
@@ -328,22 +344,6 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         await _requests.DeactivateActorsAsync(tx, request.Id, ct);
 
         var newVersion = request.RowVersion + 1;
-
-        if (rejected)
-        {
-            var rejectedRequest = request with
-            {
-                ApprovalStatus = ApprovalStatus.Rejected,
-                CurrentStatus = RequestStatus.Rejected,
-                ResponsibleEmployeeId = null,
-                ResponsibleRole = null
-            };
-            await PersistRequestAsync(tx, rejectedRequest, request.RowVersion, ct);
-            await AppendAuditAsync(tx, request.Id, AuditEventTypes.Rejected, actor.UserId, actor.Name, actorRole,
-                current.StepKey, request.CurrentStatus.ToString(), RequestStatus.Rejected.ToString(), reason, null, now, ct);
-            await RunTerminalHooksAsync(connection, tx, actor, rejectedRequest with { RowVersion = newVersion }, RequestStatus.Rejected, ct);
-            return newVersion;
-        }
 
         var eventType = command.Action == RequestAction.Approve ? AuditEventTypes.StepApproved : AuditEventTypes.StepCompleted;
         await AppendAuditAsync(tx, request.Id, eventType, actor.UserId, actor.Name, actorRole,
@@ -397,7 +397,45 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         return newVersion;
     }
 
+    // A rejection ends the request as Rejected with approval status Rejected, whatever kind of step
+    // it happened at and whoever rejected it. The current step records who rejected it and why.
+    private async Task<long> RejectAsync(
+        DbConnection connection, DbTransaction tx, ActorContext actor, RequestSnapshot request, List<RequestStepRow> rows,
+        RequestStepRow current, string actorRole, string? reason, DateTime now, CancellationToken ct)
+    {
+        var acted = current with
+        {
+            State = StepState.Rejected,
+            ActedByUserId = actor.UserId,
+            ActedByName = actor.Name,
+            ActedUtc = now,
+            Comment = reason
+        };
+        await _requests.UpdateStepAsync(tx, acted, ct);
+        rows[rows.FindIndex(r => r.Seq == acted.Seq)] = acted;
+        await _requests.DeactivateActorsAsync(tx, request.Id, ct);
+
+        var newVersion = request.RowVersion + 1;
+        var rejectedRequest = request with
+        {
+            ApprovalStatus = ApprovalStatus.Rejected,
+            CurrentStatus = RequestStatus.Rejected,
+            ResponsibleEmployeeId = null,
+            ResponsibleRole = null
+        };
+        await PersistRequestAsync(tx, rejectedRequest, request.RowVersion, ct);
+        await AppendAuditAsync(tx, request.Id, AuditEventTypes.Rejected, actor.UserId, actor.Name, actorRole,
+            current.StepKey, request.CurrentStatus.ToString(), RequestStatus.Rejected.ToString(), reason, null, now, ct);
+        await RunTerminalHooksAsync(connection, tx, actor, rejectedRequest with { RowVersion = newVersion }, RequestStatus.Rejected, ct);
+        return newVersion;
+    }
+
     // ---------------------------------------------------------------- helpers
+
+    private static bool IsOverride(ActorContext actor) => actor.Roles.Overlaps(Roles.RequestOverride);
+
+    private static string OverrideLabel(ActorContext actor) =>
+        actor.Roles.Contains(Roles.Admin) ? Roles.Admin : SystemAdminLabel;
 
     private static ForbiddenException NotAllowed() =>
         new("You cannot perform this action on this request.", ErrorCodes.ACTION_NOT_ALLOWED);
