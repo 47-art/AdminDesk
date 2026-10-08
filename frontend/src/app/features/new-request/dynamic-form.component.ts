@@ -22,7 +22,17 @@ import { FIELD_TYPES, PRIORITIES } from '../../core/constants/field-types';
 import { FieldErrorComponent } from '../../shared/field-error/field-error.component';
 import { formatDate } from '../../shared/formatters/dates';
 import { LookupFieldComponent } from '../../shared/lookup-field/lookup-field.component';
-import { CommonGroup, FieldGroup, REMARKS_MAX_LENGTH, commonDomId, errorMessage, fieldDomId } from './form-builder';
+import {
+  CommonGroup,
+  CommonGroupControls,
+  FieldGroup,
+  REMARKS_MAX_LENGTH,
+  applyRequiredCommon,
+  commonDomId,
+  errorMessage,
+  fieldDomId,
+  requiredCommonControls,
+} from './form-builder';
 
 export interface RequesterInfo {
   name: string;
@@ -292,17 +302,32 @@ const FILTER_ABOVE_OPTIONS = 8;
               <div class="readonly" id="common-department">{{ requester()?.department || 'Not provided' }}</div>
             </div>
             <div class="field">
-              <div class="label-row"><label [for]="ids.projectId">Project</label></div>
+              <div class="label-row">
+                <label [for]="ids.projectId">Project</label>
+                @if (isRequiredCommon('projectId')) {
+                  <span class="required"> (required)</span>
+                }
+              </div>
               <app-lookup-field kind="project" placeholder="Type to search" [inputId]="ids.projectId" [formControl]="c.controls.projectId" />
               <app-field-error [id]="ids.projectId + '-error'" [message]="commonMessage('projectId')" />
             </div>
             <div class="field">
-              <div class="label-row"><label [for]="ids.locationId">Location</label></div>
+              <div class="label-row">
+                <label [for]="ids.locationId">Location</label>
+                @if (isRequiredCommon('locationId')) {
+                  <span class="required"> (required)</span>
+                }
+              </div>
               <app-lookup-field kind="location" placeholder="Type to search" [inputId]="ids.locationId" [formControl]="c.controls.locationId" />
               <app-field-error [id]="ids.locationId + '-error'" [message]="commonMessage('locationId')" />
             </div>
             <div class="field">
-              <div class="label-row"><label [for]="ids.costCentreId">Cost centre</label></div>
+              <div class="label-row">
+                <label [for]="ids.costCentreId">Cost centre</label>
+                @if (isRequiredCommon('costCentreId')) {
+                  <span class="required"> (required)</span>
+                }
+              </div>
               <app-lookup-field kind="costCentre" placeholder="Type to search" [inputId]="ids.costCentreId" [formControl]="c.controls.costCentreId" />
               <app-field-error [id]="ids.costCentreId + '-error'" [message]="commonMessage('costCentreId')" />
             </div>
@@ -370,6 +395,8 @@ export class DynamicFormComponent {
   /** The fixed fields. Leave out in capture-fields mode. */
   readonly common = input<CommonGroup | null>(null);
   readonly requester = input<RequesterInfo | null>(null);
+  /** Common fields the module requires, as listed in its definition (location, project, costCentre). */
+  readonly requiredCommon = input<readonly string[]>([]);
   /** When given, only these fields are drawn, in one column, with no sections. */
   readonly captureFields = input<FieldDto[] | null>(null);
 
@@ -411,6 +438,11 @@ export class DynamicFormComponent {
   });
 
   constructor() {
+    effect(() => {
+      const common = this.common();
+      if (common) applyRequiredCommon(common, this.requiredCommon());
+    });
+
     effect((onCleanup) => {
       const subscriptions = [this.group().events.subscribe(() => this.tick.update((n) => n + 1))];
       const common = this.common();
@@ -473,6 +505,10 @@ export class DynamicFormComponent {
   protected messageFor(field: FieldDto): string | null {
     this.tick();
     return errorMessage(this.ctl(field), field);
+  }
+
+  protected isRequiredCommon(name: keyof CommonGroupControls): boolean {
+    return requiredCommonControls(this.requiredCommon()).includes(name);
   }
 
   protected commonMessage(name: keyof CommonGroup['controls']): string | null {

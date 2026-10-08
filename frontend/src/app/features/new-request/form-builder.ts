@@ -117,8 +117,37 @@ export function buildGroup(fields: FieldDto[], requesterName?: string): FieldGro
   return group;
 }
 
-/** The fixed fields every request carries. */
-export function buildCommonGroup(): CommonGroup {
+/** Definition key of a common field that a module can require, and the control that holds it. */
+const REQUIRED_COMMON_CONTROLS: Record<string, keyof CommonGroupControls> = {
+  location: 'locationId',
+  project: 'projectId',
+  costCentre: 'costCentreId',
+};
+
+/** Names of the common controls the module requires, for example ['locationId']. */
+export function requiredCommonControls(keys: readonly string[] | null | undefined): (keyof CommonGroupControls)[] {
+  return (keys ?? []).map((k) => REQUIRED_COMMON_CONTROLS[k]).filter((c): c is keyof CommonGroupControls => !!c);
+}
+
+/** Adds the required validator to the common controls the module lists; safe to call more than once. */
+export function applyRequiredCommon(common: CommonGroup, keys: readonly string[] | null | undefined): void {
+  for (const name of requiredCommonControls(keys)) {
+    const control = common.controls[name];
+    if (!control.hasValidator(Validators.required)) {
+      control.addValidators(Validators.required);
+      control.updateValueAndValidity({ emitEvent: false });
+    }
+  }
+}
+
+/** The fixed fields every request carries. Pass the module's required common fields to mark them required. */
+export function buildCommonGroup(requiredKeys: readonly string[] = []): CommonGroup {
+  const group = createCommonGroup();
+  applyRequiredCommon(group, requiredKeys);
+  return group;
+}
+
+function createCommonGroup(): CommonGroup {
   return new FormGroup<CommonGroupControls>({
     projectId: new FormControl<number | null>(null),
     locationId: new FormControl<number | null>(null),
@@ -227,7 +256,7 @@ export function errorMessage(control: AbstractControl | null | undefined, field?
   const errors = control.errors;
   if (!errors) return null;
   if (typeof errors['server'] === 'string') return errors['server'];
-  if (errors['required']) return 'Enter a value for this field.';
+  if (errors['required']) return field ? 'Enter a value for this field.' : 'Select a value from the list.';
   if (errors['maxlength']) return `Use ${errors['maxlength'].requiredLength} characters or fewer.`;
   if (errors['min']) return `Enter a value of at least ${errors['min'].min}.`;
   if (errors['max']) return `Enter a value of at most ${errors['max'].max}.`;

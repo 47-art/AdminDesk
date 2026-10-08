@@ -135,6 +135,8 @@ export interface ModuleDefinitionDto {
   prefix: string;
   sections: SectionDto[];
   steps: StepSummary[];
+  /** Common fields (location, project, costCentre) this module insists on. */
+  requiredCommonFields?: string[];
 }
 
 export interface CommonFieldsInput {
