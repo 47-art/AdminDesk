@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AdminDesk.SharedKernel.Enums;
 
 namespace AdminDesk.Domain.Definitions;
@@ -47,6 +48,18 @@ public sealed record FieldDefinition
 
     // A registered lookup kind such as employee or costCentre, matched without regard to case.
     public string? LookupKind { get; init; }
+
+    // When set, the field is shown, required and checked only while the named earlier field
+    // of the same list holds this value; otherwise it is ignored and left out of what is stored.
+    public ShowWhenRule? ShowWhen { get; init; }
+}
+
+public sealed record ShowWhenRule
+{
+    public string Field { get; init; } = string.Empty;
+
+    [JsonPropertyName("equals")]
+    public string Value { get; init; } = string.Empty;
 }
 
 public sealed record StepActor

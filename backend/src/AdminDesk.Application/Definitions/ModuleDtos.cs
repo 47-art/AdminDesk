@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace AdminDesk.Application.Definitions;
 
 public sealed record ModuleSummaryDto(
@@ -21,7 +23,10 @@ public sealed record FieldDto(
     string? HelpText,
     bool FullWidth,
     IReadOnlyList<FieldOptionDto> Options,
-    string? LookupKind);
+    string? LookupKind,
+    ShowWhenDto? ShowWhen);
+
+public sealed record ShowWhenDto(string Field, [property: JsonPropertyName("equals")] string Value);
 
 public sealed record SectionDto(string Title, IReadOnlyList<FieldDto> Fields);
 

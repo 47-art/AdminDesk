@@ -83,7 +83,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
             field.HelpText,
             field.FullWidth,
             (field.Options ?? Array.Empty<FieldOption>()).Select(o => new FieldOptionDto(o.Value, o.Label)).ToList(),
-            field.LookupKind);
+            field.LookupKind,
+            field.ShowWhen is { } rule ? new ShowWhenDto(rule.Field, rule.Value) : null);
 
     public static ModuleDefinitionDto ToDto(IssuedDefinition issued)
     {

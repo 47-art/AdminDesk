@@ -89,11 +89,13 @@ public static class DefinitionValidator
         var fieldKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in fields)
         {
+            var earlier = fieldKeys.ToList();
             if (!string.IsNullOrEmpty(field.Key) && !fieldKeys.Add(field.Key))
             {
                 problems.Add($"{Where()}: field key '{field.Key}' is used more than once");
             }
             ValidateField(file, $"field '{field.Key}'", field, lookupKinds, problems);
+            ValidateShowWhen(file, $"field '{field.Key}'", field, earlier, problems);
         }
 
         var stepKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -128,11 +130,13 @@ public static class DefinitionValidator
             var captureKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var field in capture)
             {
+                var earlierCapture = captureKeys.ToList();
                 if (!string.IsNullOrEmpty(field.Key) && !captureKeys.Add(field.Key))
                 {
                     problems.Add($"{Where()}: step '{step.Key}' capture field key '{field.Key}' is used more than once");
                 }
                 ValidateField(file, $"step '{step.Key}' capture field '{field.Key}'", field, lookupKinds, problems);
+                ValidateShowWhen(file, $"step '{step.Key}' capture field '{field.Key}'", field, earlierCapture, problems);
             }
 
             if (step.Condition is not null)
@@ -220,6 +224,33 @@ public static class DefinitionValidator
         if (field.Min is { } min && field.Max is { } max && min > max)
         {
             problems.Add($"Definition '{file}': {subject} min is above max");
+        }
+    }
+
+    // A field may only depend on a field that comes before it in the same list.
+    private static void ValidateShowWhen(
+        string file, string subject, FieldDefinition field, IReadOnlyList<string> earlierKeys, List<string> problems)
+    {
+        var rule = field.ShowWhen;
+        if (rule is null)
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(rule.Field))
+        {
+            problems.Add($"Definition '{file}': {subject} showWhen needs a field");
+        }
+        else if (rule.Field == field.Key)
+        {
+            problems.Add($"Definition '{file}': {subject} showWhen cannot refer to the field itself");
+        }
+        else if (!earlierKeys.Contains(rule.Field))
+        {
+            problems.Add($"Definition '{file}': {subject} showWhen refers to '{rule.Field}', which is not an earlier field in the same list (earlier fields: {Join(earlierKeys)})");
+        }
+        if (string.IsNullOrEmpty(rule.Value))
+        {
+            problems.Add($"Definition '{file}': {subject} showWhen needs a value in 'equals'");
         }
     }
 

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Reflection;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AdminDesk.Domain.Definitions;
 using AdminDesk.SharedKernel.Constants;
 using Microsoft.Extensions.Configuration;
@@ -148,7 +149,10 @@ internal static class ShapeChecker
 
         var properties = type
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)
-            .ToDictionary(p => JsonNamingPolicy.CamelCase.ConvertName(p.Name), p => p, StringComparer.Ordinal);
+            .ToDictionary(
+                p => p.GetCustomAttribute<JsonPropertyNameAttribute>()?.Name ?? JsonNamingPolicy.CamelCase.ConvertName(p.Name),
+                p => p,
+                StringComparer.Ordinal);
 
         foreach (var member in element.EnumerateObject())
         {

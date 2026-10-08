@@ -112,8 +112,24 @@ public sealed class DefinitionPayloadValidator
             }
         }
 
+        // Fields hidden by a show-when rule are ignored whatever the client sent: they are not
+        // required, not checked and not stored. A field depending on a hidden field is hidden too.
+        var hidden = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in fields)
         {
+            if (field.ShowWhen is { } rule &&
+                (hidden.Contains(rule.Field) || !ShownValueMatches(input, rule)))
+            {
+                hidden.Add(field.Key);
+            }
+        }
+
+        foreach (var field in fields)
+        {
+            if (hidden.Contains(field.Key))
+            {
+                continue;
+            }
             input.TryGetValue(field.Key, out var raw);
             var missing = !input.ContainsKey(field.Key) || IsBlank(raw);
             if (missing)
@@ -133,6 +149,23 @@ public sealed class DefinitionPayloadValidator
             }
         }
         return values;
+    }
+
+    private static bool ShownValueMatches(IReadOnlyDictionary<string, JsonElement> input, ShowWhenRule rule)
+    {
+        if (!input.TryGetValue(rule.Field, out var other))
+        {
+            return false;
+        }
+        var text = other.ValueKind switch
+        {
+            JsonValueKind.String => other.GetString(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
+            JsonValueKind.Number => other.GetRawText(),
+            _ => null
+        };
+        return text is not null && string.Equals(text.Trim(), rule.Value, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsBlank(JsonElement raw) => raw.ValueKind switch
