@@ -125,6 +125,12 @@ public interface IRequestQueryRepository
 
     Task<PagedRows<RequestListRow>> ListMineAsync(long employeeId, MineFilter filter, CancellationToken ct);
 
+    // Every active request (organisation-wide).
+    Task<PagedRows<RequestListRow>> ListAllAsync(MineFilter filter, CancellationToken ct);
+
+    // Requests raised by the direct reports of the given manager.
+    Task<PagedRows<RequestListRow>> ListTeamAsync(long managerEmployeeId, MineFilter filter, CancellationToken ct);
+
     // employeeId is null for a user without an employee record: only the role match applies.
     Task<PagedRows<RequestListRow>> ListInboxAsync(
         long? employeeId, IReadOnlyCollection<string> roles, InboxFilter filter, CancellationToken ct);

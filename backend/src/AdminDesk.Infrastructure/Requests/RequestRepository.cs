@@ -190,6 +190,8 @@ public sealed class RequestRepository : IRequestRepository
             "SELECT EXISTS (SELECT 1 FROM requests r WHERE r.id = @Id AND " + AuditSql.Active("r") + " AND (" +
             "@Privileged = 1 " +
             "OR r.requester_employee_id = @EmployeeId " +
+            "OR EXISTS (SELECT 1 FROM employees rq WHERE rq.id = r.requester_employee_id " +
+            "AND rq.reporting_manager_id = @EmployeeId) " +
             "OR EXISTS (SELECT 1 FROM request_steps s WHERE s.request_id = r.id AND s.acted_by_user_id = @UserId) " +
             "OR EXISTS (SELECT 1 FROM request_step_actors a WHERE a.request_id = r.id AND a.is_active = 1 " +
             "AND (a.employee_id = @EmployeeId OR a.role_name IN @RoleNames))))";

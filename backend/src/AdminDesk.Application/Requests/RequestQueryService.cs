@@ -21,6 +21,10 @@ public interface IRequestQueryService
 
     Task<PagedResult<RequestListItem>> MineAsync(ActorContext actor, MineQuery query, CancellationToken ct);
 
+    Task<PagedResult<RequestListItem>> AllAsync(ActorContext actor, MineQuery query, CancellationToken ct);
+
+    Task<PagedResult<RequestListItem>> TeamAsync(ActorContext actor, MineQuery query, CancellationToken ct);
+
     Task<PagedResult<RequestListItem>> InboxAsync(ActorContext actor, InboxQuery query, CancellationToken ct);
 
     Task<int> InboxCountAsync(ActorContext actor, CancellationToken ct);
@@ -186,7 +190,41 @@ public sealed class RequestQueryService : IRequestQueryService
             return new PagedResult<RequestListItem>(Array.Empty<RequestListItem>(), 0, page, pageSize);
         }
 
-        var filter = new MineFilter(
+        var filter = ToFilter(query, page, pageSize);
+        var rows = await _repository.ListMineAsync(employeeId, filter, ct);
+        var items = await ToItemsAsync(rows.Items, ct);
+        return new PagedResult<RequestListItem>(items, rows.Total, page, pageSize);
+    }
+
+    public async Task<PagedResult<RequestListItem>> AllAsync(ActorContext actor, MineQuery query, CancellationToken ct)
+    {
+        // The route policy is the first guard; this keeps the service safe when called from elsewhere.
+        if (!actor.Roles.Any(Roles.OrganisationWide.Contains))
+        {
+            throw new ForbiddenException("You cannot see every request.");
+        }
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, RequestParsing.MaxPageSize);
+        var rows = await _repository.ListAllAsync(ToFilter(query, page, pageSize), ct);
+        var items = await ToItemsAsync(rows.Items, ct);
+        return new PagedResult<RequestListItem>(items, rows.Total, page, pageSize);
+    }
+
+    public async Task<PagedResult<RequestListItem>> TeamAsync(ActorContext actor, MineQuery query, CancellationToken ct)
+    {
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, RequestParsing.MaxPageSize);
+        if (actor.EmployeeId is not { } managerId)
+        {
+            return new PagedResult<RequestListItem>(Array.Empty<RequestListItem>(), 0, page, pageSize);
+        }
+        var rows = await _repository.ListTeamAsync(managerId, ToFilter(query, page, pageSize), ct);
+        var items = await ToItemsAsync(rows.Items, ct);
+        return new PagedResult<RequestListItem>(items, rows.Total, page, pageSize);
+    }
+
+    private static MineFilter ToFilter(MineQuery query, int page, int pageSize) =>
+        new(
             string.IsNullOrWhiteSpace(query.Q) ? null : query.Q.Trim(),
             query.Status.Select(s => RequestParsing.ParseEnum<RequestStatus>(s)).Where(s => s is not null).Select(s => s!.Value).Distinct().ToList(),
             RequestParsing.ParseEnum<ApprovalStatus>(query.ApprovalStatus),
@@ -197,11 +235,6 @@ public sealed class RequestQueryService : IRequestQueryService
             pageSize,
             query.Sort,
             query.Dir);
-
-        var rows = await _repository.ListMineAsync(employeeId, filter, ct);
-        var items = await ToItemsAsync(rows.Items, ct);
-        return new PagedResult<RequestListItem>(items, rows.Total, page, pageSize);
-    }
 
     public async Task<PagedResult<RequestListItem>> InboxAsync(ActorContext actor, InboxQuery query, CancellationToken ct)
     {

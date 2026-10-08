@@ -215,7 +215,9 @@ main_mode() {
   T_HR=$(login hr@demo.test)
   T_SEC=$(login security@demo.test)
   T_MGT=$(login management@demo.test)
-  for t in "$T_EMP" "$T_MGR" "$T_ADM" "$T_STORE" "$T_SYS" "$T_HR" "$T_SEC" "$T_MGT"; do
+  T_FIN=$(login finance@demo.test)
+  T_IT=$(login it@demo.test)
+  for t in "$T_EMP" "$T_MGR" "$T_ADM" "$T_STORE" "$T_SYS" "$T_HR" "$T_SEC" "$T_MGT" "$T_FIN" "$T_IT"; do
     if [ "$t" = "null" ] || [ -z "$t" ]; then echo "FAIL demo sign-in (is demo mode on?)"; exit 1; fi
   done
 
@@ -639,15 +641,104 @@ main_mode() {
     STATUS_SUM=$((STATUS_SUM + $(jget d.data.total)))
   done
   assert_eq "dashboard: the status counts add up to the total" "$STATUS_SUM" "$EMP_TOTAL"
-  for who in "Admin:$T_ADM" "SystemAdmin:$T_SYS" "Management:$T_MGT"; do
+  for who in "Admin:$T_ADM" "SystemAdmin:$T_SYS"; do
     call GET /api/dashboard/summary "${who#*:}"
     assert_eq "dashboard: ${who%%:*} sees the organisation scope" "$(jget d.data.scope)" Organisation
     assert_true "dashboard: ${who%%:*} total covers at least the employee's requests" "$(jget "d.data.total >= $EMP_TOTAL")"
     assert_true "dashboard: ${who%%:*} cancelled covers at least the employee's" "$(jget "d.data.cancelled >= $EMP_CANCELLED")"
   done
-  for who in "Manager:$T_MGR" "HR:$T_HR" "Store:$T_STORE" "Security:$T_SEC"; do
+  for who in "Manager:$T_MGR" "HR:$T_HR" "Store:$T_STORE" "Security:$T_SEC" "Management:$T_MGT" "Finance:$T_FIN" "IT:$T_IT"; do
     call GET /api/dashboard/summary "${who#*:}"
     assert_eq "dashboard: ${who%%:*} sees their own scope" "$(jget d.data.scope)" Mine
+  done
+
+  # ------------------------------------------- all requests (Admin and SystemAdmin only)
+  for who in "Employee:$T_EMP" "Manager:$T_MGR" "Finance:$T_FIN" "HR:$T_HR" "IT:$T_IT" "Store:$T_STORE" "Security:$T_SEC" "Management:$T_MGT"; do
+    call GET "/api/requests/all" "${who#*:}"
+    assert_status "all requests: ${who%%:*} gets 403" 403
+  done
+  for who in "Admin:$T_ADM" "SystemAdmin:$T_SYS"; do
+    tok=${who#*:}; name=${who%%:*}
+    call GET "/api/requests/all?page=1&pageSize=1" "$tok"
+    assert_status "all requests: $name gets 200" 200
+    ALL_TOTAL=$(jget d.data.total)
+    call GET /api/dashboard/summary "$tok"
+    assert_eq "all requests: $name list total equals the dashboard total" "$ALL_TOTAL" "$(jget d.data.total)"
+    D_PENDING=$(jget d.data.pending); D_APPROVED=$(jget d.data.approved); D_REJECTED=$(jget d.data.rejected)
+    D_COMPLETED=$(jget d.data.completed); D_CANCELLED=$(jget d.data.cancelled)
+    call GET "/api/requests/all?status=InProgress&approvalStatus=Pending&pageSize=1" "$tok"
+    assert_eq "all requests: $name pending card equals its list" "$(jget d.data.total)" "$D_PENDING"
+    call GET "/api/requests/all?approvalStatus=Approved&pageSize=1" "$tok"
+    assert_eq "all requests: $name approved card equals its list" "$(jget d.data.total)" "$D_APPROVED"
+    call GET "/api/requests/all?status=Rejected&pageSize=1" "$tok"
+    assert_eq "all requests: $name rejected card equals its list" "$(jget d.data.total)" "$D_REJECTED"
+    call GET "/api/requests/all?status=Closed&pageSize=1" "$tok"
+    assert_eq "all requests: $name completed card equals its list" "$(jget d.data.total)" "$D_COMPLETED"
+    call GET "/api/requests/all?status=Cancelled&pageSize=1" "$tok"
+    assert_eq "all requests: $name cancelled card equals its list" "$(jget d.data.total)" "$D_CANCELLED"
+  done
+  call GET "/api/requests/all?pageSize=100" "$T_ADM"
+  assert_true "all requests: rows carry the requester and department" \
+    "$(jget 'd.data.items.length > 0 && d.data.items.every(i => typeof i.requesterName === "string" && i.requesterName.length > 0) && d.data.items.some(i => i.requesterDepartment)')"
+  assert_true "all requests: more than one requester appears" "$(jget 'new Set(d.data.items.map(i => i.requesterName)).size > 1')"
+
+  # ------------------------------------------- team requests
+  call GET /api/requests/team
+  assert_status "team requests: no token gets 401" 401
+  call GET /api/requests/all
+  assert_status "all requests: no token gets 401" 401
+  # Courier steps are held by Admin and the requester only, so the Manager role is never an actor on it.
+  create "$T_EMP" "$(cur_body)"; TEAM_R=$RID
+  assert_status "team requests: the employee's courier request is created" 201
+  create "$T_STORE" "$(cur_body)"; OTHER_R=$RID
+  assert_status "team requests: a non-team employee's courier request is created" 201
+  call GET "/api/requests/team?pageSize=100" "$T_MGR"
+  assert_status "team requests: Manager gets 200" 200
+  assert_true "team requests: Manager's list holds the direct report's request" "$(jget "d.data.items.some(i => i.id === $TEAM_R)")"
+  assert_true "team requests: Manager's list does not hold the non-team request" "$(jget "d.data.items.every(i => i.id !== $OTHER_R)")"
+  call GET "/api/team?pageSize=100" "$T_MGR"
+  TEAM_NAMES=$(jget 'JSON.stringify(d.data.items.map(i => i.fullName))')
+  call GET "/api/requests/team?pageSize=100" "$T_MGR"
+  assert_true "team requests: every row was raised by a direct report" \
+    "$(jget "d.data.items.length > 0 && d.data.items.every(i => $TEAM_NAMES.includes(i.requesterName))")"
+  call GET "/api/requests/team?pageSize=100" "$T_EMP"
+  assert_status "team requests: an employee with no reports gets 200" 200
+  assert_eq "team requests: that employee's page is empty" "$(jget 'd.data.total + ":" + d.data.items.length')" "0:0"
+
+  # ------------------------------------------- who may open a request
+  detail "$TEAM_R" "$T_MGR"
+  assert_status "visibility: Manager opens the direct report's request" 200
+  assert_eq "visibility: Manager has no actions on it" "$(jget 'd.data.allowedActions.length')" 0
+  MGR_RV=$(jget d.data.rowVersion)
+  act_rv "$TEAM_R" "$T_MGR" Cancel "$MGR_RV" '"Not mine to cancel"'
+  assert_true "visibility: Manager cannot cancel the direct report's request" "$([ "$STATUS" = "403" ] && echo true || echo false)"
+  detail "$TEAM_R" "$T_EMP"
+  assert_eq "visibility: the request is still in progress after the refused cancel" "$(jget d.data.currentStatus)" InProgress
+  detail "$OTHER_R" "$T_MGR"
+  assert_status "visibility: Manager gets 404 for a non-team employee's request" 404
+  detail "$OTHER_R" "$T_EMP"
+  assert_status "visibility: Employee gets 404 for another employee's request" 404
+  detail "$TEAM_R" "$T_STORE"
+  assert_status "visibility: Store gets 404 for another employee's request" 404
+  detail "$OTHER_R" "$T_STORE"
+  assert_status "visibility: the requester opens their own request" 200
+  for who in "Admin:$T_ADM" "SystemAdmin:$T_SYS"; do
+    detail "$OTHER_R" "${who#*:}"
+    assert_status "visibility: ${who%%:*} opens any request" 200
+  done
+
+  # ------------------------------------------- list query checks on all and team
+  for pair in "all:$T_ADM" "team:$T_MGR"; do
+    lp="/api/requests/${pair%%:*}"; lt=${pair#*:}
+    call GET "$lp?dir=sideways" "$lt"
+    assert_status "${pair%%:*}: bad direction gets 400" 400
+    call GET "$lp?status=Bogus" "$lt"
+    assert_status "${pair%%:*}: bad status gets 400" 400
+    call GET "$lp?pageSize=101" "$lt"
+    assert_status "${pair%%:*}: page size above 100 gets 400" 400
+    call GET "$lp?sort=nonsense%3B%20DROP%20TABLE%20requests&dir=asc" "$lt"
+    assert_status "${pair%%:*}: unknown sort falls back without an error" 200
+    assert_not_contains "${pair%%:*}: no database text in the response" "$BODY" SQLite
   done
 
   # --------------------------------------------------- authentication

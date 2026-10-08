@@ -1,7 +1,8 @@
 namespace AdminDesk.Application.Engine;
 
 // The single visibility rule for a request: the requester, any past or current step actor,
-// holders of a role that currently has the step, and the Admin and SystemAdmin roles.
+// holders of a role that currently has the step, the requester's direct manager, and the
+// Admin and SystemAdmin roles.
 // Used by the detail query and the audit trail alike.
 public sealed class RequestAccessPolicy
 {

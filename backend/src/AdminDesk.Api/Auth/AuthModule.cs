@@ -37,6 +37,7 @@ public sealed class AuthModule : IServiceModule
             options.AddPolicy(Policies.Authenticated, p => p.RequireAuthenticatedUser());
             options.AddPolicy(Policies.SystemAdminOnly, p => p.RequireRole(Roles.SystemAdmin));
             options.AddPolicy(Policies.AdminOrSystemAdmin, p => p.RequireRole(Roles.Admin, Roles.SystemAdmin));
+            options.AddPolicy(Policies.OrganisationWide, p => p.RequireRole(Roles.OrganisationWide));
             options.AddPolicy(Policies.TeamViewers, p => p.RequireRole(Policies.TeamViewerRoles));
         });
     }

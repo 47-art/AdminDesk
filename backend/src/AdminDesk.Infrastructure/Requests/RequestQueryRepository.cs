@@ -119,11 +119,26 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
 
     // ------------------------------------------------------------------ mine
 
-    public async Task<PagedRows<RequestListRow>> ListMineAsync(long employeeId, MineFilter filter, CancellationToken ct)
+    public Task<PagedRows<RequestListRow>> ListMineAsync(long employeeId, MineFilter filter, CancellationToken ct) =>
+        ListFilteredAsync("r.requester_employee_id = @Who", employeeId, filter, ct);
+
+    public Task<PagedRows<RequestListRow>> ListAllAsync(MineFilter filter, CancellationToken ct) =>
+        ListFilteredAsync(null, null, filter, ct);
+
+    public Task<PagedRows<RequestListRow>> ListTeamAsync(long managerEmployeeId, MineFilter filter, CancellationToken ct) =>
+        ListFilteredAsync("re.reporting_manager_id = @Who", managerEmployeeId, filter, ct);
+
+    // One filter builder for the three request lists; only the "who" clause differs.
+    private async Task<PagedRows<RequestListRow>> ListFilteredAsync(
+        string? whoClause, long? who, MineFilter filter, CancellationToken ct)
     {
         var parameters = new DynamicParameters();
-        var where = new List<string> { AuditSql.Active("r"), "r.requester_employee_id = @Employee" };
-        parameters.Add("Employee", employeeId);
+        var where = new List<string> { AuditSql.Active("r") };
+        if (whoClause is not null)
+        {
+            where.Add(whoClause);
+            parameters.Add("Who", who);
+        }
 
         if (!string.IsNullOrWhiteSpace(filter.Q))
         {
