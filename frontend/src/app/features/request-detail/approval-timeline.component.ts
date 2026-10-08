@@ -174,7 +174,7 @@ export class ApprovalTimelineComponent {
         current: false,
         dashed: false,
         muted: false,
-        line: `Cancelled by ${d.requester.name}${d.cancelledUtc ? ` on ${formatDateTime(d.cancelledUtc)}` : ''}`,
+        line: `Cancelled by ${d.stoppedByName ?? d.requester.name}${d.stoppedByRole ? ` (${d.stoppedByRole})` : ''}${d.cancelledUtc ? ` on ${formatDateTime(d.cancelledUtc)}` : ''}`,
         note: d.cancelReason,
         captured: [],
         secondary: null,
@@ -194,6 +194,11 @@ export class ApprovalTimelineComponent {
       else next.add(id);
       return next;
     });
+  }
+
+  // " (Admin)" after the name of whoever rejected the request, when the audit trail names the same person.
+  private rejectedRole(step: RequestStepDto, d: RequestDetail): string {
+    return d.stoppedByRole && d.stoppedByName === step.actedByName ? ` (${d.stoppedByRole})` : '';
   }
 
   private toEntry(step: RequestStepDto, d: RequestDetail): Entry {
@@ -219,7 +224,7 @@ export class ApprovalTimelineComponent {
           style: STEP_STATE_STYLES.Rejected,
           dashed: false,
           muted: false,
-          line: `Rejected by ${step.actedByName ?? role}${step.actedUtc ? ` on ${formatDateTime(step.actedUtc)}` : ''}`,
+          line: `Rejected by ${step.actedByName ?? role}${this.rejectedRole(step, d)}${step.actedUtc ? ` on ${formatDateTime(step.actedUtc)}` : ''}`,
           secondary: null,
           note: step.comment,
         };

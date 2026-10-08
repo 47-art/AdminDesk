@@ -216,6 +216,8 @@ export interface RequestDetail {
   primaryActionLabel: string | null;
   cancelReason: string | null;
   cancelledUtc: string | null;
+  stoppedByName: string | null;
+  stoppedByRole: string | null;
 }
 
 export interface AuditEventDto {
