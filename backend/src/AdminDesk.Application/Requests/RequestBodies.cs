@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AdminDesk.Application.Engine;
 using AdminDesk.SharedKernel.Enums;
+using AdminDesk.SharedKernel.Exceptions;
 
 namespace AdminDesk.Application.Requests;
 
@@ -63,7 +64,8 @@ public sealed class ActionBody
 
     public ActionCommand ToCommand() => new()
     {
-        Action = RequestParsing.ParseEnum<RequestAction>(Action) ?? RequestAction.Approve,
+        Action = RequestParsing.ParseEnum<RequestAction>(Action)
+            ?? throw new ValidationException("action", "Choose a valid action."),
         Comment = Comment,
         Captured = Captured,
         ExpectedRowVersion = RowVersion
