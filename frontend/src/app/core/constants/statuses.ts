@@ -79,3 +79,12 @@ export const STATUS_SORT_ORDER: readonly RequestStatus[] = [
   REQUEST_STATUSES.Rejected,
   REQUEST_STATUSES.Cancelled,
 ];
+
+/** Shown for a step whose actor label is missing. Matches the server's Labels.ReportingManager. */
+export const REPORTING_MANAGER_LABEL = 'Reporting manager';
+
+/** Primary action wording when a step carries no label of its own. */
+export const DEFAULT_ACTION_LABELS = {
+  Approve: 'Approve',
+  Complete: 'Complete',
+} as const;

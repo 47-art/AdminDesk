@@ -10,6 +10,7 @@ import { ApiError } from '../../core/api/api-error';
 import { AuthApi } from '../../core/api/auth.api';
 import { DemoAccount, PublicConfig } from '../../core/api/models';
 import { AuthService } from '../../core/auth/auth.service';
+import { ERROR_CODES } from '../../core/constants/error-codes';
 import { ROUTE_PATHS } from '../../core/constants/routes';
 
 const INVALID_CREDENTIALS_MESSAGE = 'Email or password is incorrect. Check them and try again.';
@@ -278,8 +279,8 @@ export class LoginPage implements OnInit {
   private messageFor(err: unknown): string {
     if (err instanceof ApiError) {
       if (err.status === 0) return NETWORK_MESSAGE;
-      if (err.code === 'ACCOUNT_LOCKED') return LOCKED_MESSAGE;
-      if (err.code === 'INVALID_CREDENTIALS') return INVALID_CREDENTIALS_MESSAGE;
+      if (err.code === ERROR_CODES.AccountLocked) return LOCKED_MESSAGE;
+      if (err.code === ERROR_CODES.InvalidCredentials) return INVALID_CREDENTIALS_MESSAGE;
     }
     return err instanceof ApiError && err.status >= 500 ? 'Something went wrong on our side. Try again.' : INVALID_CREDENTIALS_MESSAGE;
   }

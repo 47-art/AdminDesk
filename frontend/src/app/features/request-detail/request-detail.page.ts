@@ -8,6 +8,7 @@ import { FieldDto, RequestAction, RequestDetail } from '../../core/api/models';
 import { RequestsApi } from '../../core/api/requests.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { BadgeCountsService } from '../../core/state/badge-counts.service';
+import { REQUEST_ACTIONS } from '../../core/constants/field-types';
 import { ROUTE_PATHS } from '../../core/constants/routes';
 import { NavigationHistoryService } from '../../core/navigation/navigation-history.service';
 import { ActionDialogComponent, DialogAction, RequestActionRunner } from '../../shared/action-dialog/action-dialog.component';
@@ -199,7 +200,7 @@ export class RequestDetailPage implements OnInit {
 
   protected onAction(d: RequestDetail, action: RequestAction): void {
     if (this.busy()) return;
-    if (action === 'Approve' || (action === 'Complete' && this.captureFieldsOf(d).length === 0)) {
+    if (action === REQUEST_ACTIONS.Approve || (action === REQUEST_ACTIONS.Complete && this.captureFieldsOf(d).length === 0)) {
       this.busy.set(true);
       this.runner.run(d.id, d.requestNo, action, d.rowVersion).subscribe((outcome) => {
         this.busy.set(false);

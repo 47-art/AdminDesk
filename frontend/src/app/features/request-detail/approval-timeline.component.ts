@@ -2,7 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, input, signal } from '@an
 import { Timeline } from 'primeng/timeline';
 
 import { FieldDto, RequestDetail, RequestStepDto } from '../../core/api/models';
+import { STEP_TYPES } from '../../core/constants/field-types';
 import {
+  REPORTING_MANAGER_LABEL,
   REQUEST_STATUS_STYLES,
   STEP_STATES,
   STEP_STATE_STYLES,
@@ -203,11 +205,11 @@ export class ApprovalTimelineComponent {
 
   private toEntry(step: RequestStepDto, d: RequestDetail): Entry {
     const base = { id: `step-${step.seq}`, title: step.name, current: step.isCurrent, note: null, captured: [] as CapturedLine[] };
-    const role = step.actorLabel ?? 'Reporting manager';
+    const role = step.actorLabel ?? REPORTING_MANAGER_LABEL;
 
     switch (step.state) {
       case STEP_STATES.Done: {
-        const verb = step.type === 'Approval' ? 'Approved' : 'Completed';
+        const verb = step.type === STEP_TYPES.Approval ? 'Approved' : 'Completed';
         return {
           ...base,
           style: STEP_STATE_STYLES.Done,

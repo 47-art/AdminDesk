@@ -13,10 +13,10 @@ import { userMessage } from '../../core/api/api-error';
 import { FieldDto, ModuleSummary, Priority, RequestDetail, RequestListItem } from '../../core/api/models';
 import { ModulesApi } from '../../core/api/modules.api';
 import { RequestsApi } from '../../core/api/requests.api';
-import { PRIORITIES } from '../../core/constants/field-types';
+import { PRIORITIES, STEP_TYPES } from '../../core/constants/field-types';
 import { ROLE_GROUPS } from '../../core/constants/roles';
 import { ROUTE_PATHS } from '../../core/constants/routes';
-import { REQUEST_STATUS_STYLES, STEP_STATE_STYLES } from '../../core/constants/statuses';
+import { DEFAULT_ACTION_LABELS, REQUEST_STATUS_STYLES, STEP_STATE_STYLES } from '../../core/constants/statuses';
 import { AuthService } from '../../core/auth/auth.service';
 import { BadgeCountsService } from '../../core/state/badge-counts.service';
 import { NotificationService } from '../../core/notifications/notification.service';
@@ -505,11 +505,11 @@ export class InboxPage implements OnInit {
 
   /** Reject shows on approval rows for everyone, and on every row for the override role. The server decides. */
   protected canReject(row: RequestListItem): boolean {
-    return row.currentStepType === 'Approval' || this.isOverride();
+    return row.currentStepType === STEP_TYPES.Approval || this.isOverride();
   }
 
   protected label(row: RequestListItem): string {
-    return row.primaryActionLabel ?? (row.currentStepType === 'Approval' ? 'Approve' : 'Complete');
+    return row.primaryActionLabel ?? (row.currentStepType === STEP_TYPES.Approval ? DEFAULT_ACTION_LABELS.Approve : DEFAULT_ACTION_LABELS.Complete);
   }
 
   protected ageColour(row: RequestListItem): string | null {
