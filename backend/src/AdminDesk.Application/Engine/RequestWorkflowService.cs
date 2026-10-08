@@ -200,12 +200,19 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
     {
         _actorAccessor.Use(actor.UserId);
 
+        // A request the caller may not see looks exactly like one that does not exist, before
+        // anything else about it (reason, row version, allowed actions) is revealed.
+        if (!await _requests.IsVisibleToAsync(requestId, actor, ct))
+        {
+            throw new NotFoundException("Request not found.", ErrorCodes.NOT_FOUND);
+        }
+
         return await _unitOfWork.ExecuteInTransactionAsync(async (connection, tx) =>
         {
             var request = await _requests.GetSnapshotAsync(tx, requestId, ct)
                 ?? throw new NotFoundException("Request not found.", ErrorCodes.NOT_FOUND);
 
-            // Order of refusals: reason (400), stale version (409), then what the actor may do (403).
+            // Order of refusals once the request is visible: reason (400), stale version (409), then what the actor may do (403).
             string? reason = null;
             if (command.Action is RequestAction.Reject or RequestAction.Cancel)
             {
