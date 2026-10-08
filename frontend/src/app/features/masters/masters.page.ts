@@ -239,7 +239,7 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
   template: `
     <h1 class="text-heading">Masters</h1>
 
-    <p-tabs [value]="kind()" (valueChange)="selectTab($event)" [scrollable]="true">
+    <p-tabs [value]="kind()" (valueChange)="selectTab($event)">
       <p-tablist>
         @for (spec of visibleSpecs(); track spec.kind) {
           <p-tab [value]="spec.kind">{{ spec.tab }}</p-tab>
