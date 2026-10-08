@@ -41,6 +41,11 @@ export const routes: Routes = [
         loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.TEAM_REQUESTS_ROUTES),
       },
       {
+        path: ROUTE_PATHS.Handled,
+        canActivate: [businessAreaGuard, roleGuard(ROLE_GROUPS.RequestHandlers)],
+        loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.HANDLED_REQUESTS_ROUTES),
+      },
+      {
         path: ROUTE_PATHS.NewRequest,
         canActivate: [businessAreaGuard, employeeProfileGuard],
         loadChildren: () => import('./features/new-request/new-request.routes').then((m) => m.NEW_REQUEST_ROUTES),

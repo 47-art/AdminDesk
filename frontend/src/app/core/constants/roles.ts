@@ -24,6 +24,8 @@ export const ROLE_GROUPS = {
   OrganisationWide: [ROLES.Admin, ROLES.SystemAdmin, ROLES.Management],
   /** Manager is derived from the reporting line at sign-in, so the role answers "has direct reports". */
   RequestManagers: [ROLES.Manager],
+  /** Roles that act on requests as a step owner and see the Handled by me list. */
+  RequestHandlers: [ROLES.IT, ROLES.HR, ROLES.Finance, ROLES.Store, ROLES.Security, ROLES.Manager],
   /** Technical roles: no business menus or list pages; they keep the dashboard, People and request links. */
   TechnicalOnly: [ROLES.SystemAdmin],
   /** Roles that only read documents; they never upload or remove. */

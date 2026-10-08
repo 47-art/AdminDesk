@@ -56,7 +56,7 @@ interface ListState {
 }
 
 function sourceOf(value: unknown): ListSource {
-  return value === 'all' || value === 'team' ? value : 'mine';
+  return value === 'all' || value === 'team' || value === 'handled' ? value : 'mine';
 }
 
 function positiveInt(value: string | null, fallback: number): number {
@@ -65,7 +65,7 @@ function positiveInt(value: string | null, fallback: number): number {
 }
 
 /** Reads the URL query string into a list state; unknown values fall back to the defaults. */
-function readState(params: ParamMap): ListState {
+function readState(params: ParamMap, defaultSort: SortKey): ListState {
   const knownStatuses = Object.values(REQUEST_STATUSES) as RequestStatus[];
   const sort = params.get('sort') as SortKey | null;
   const approval = params.get('approvalStatus');
@@ -78,14 +78,14 @@ function readState(params: ParamMap): ListState {
     module: params.get('module') || null,
     from: params.get('from'),
     to: params.get('to'),
-    sort: sort && SORT_KEYS.includes(sort) ? sort : 'requestDate',
+    sort: sort && SORT_KEYS.includes(sort) ? sort : defaultSort,
     dir: params.get('dir') === 'asc' ? 'asc' : 'desc',
     page: positiveInt(params.get('page'), 1),
     pageSize: PAGE_SIZES.includes(size) ? size : DEFAULT_PAGE_SIZE,
   };
 }
 
-type ListSource = 'mine' | 'all' | 'team';
+type ListSource = 'mine' | 'all' | 'team' | 'handled';
 
 interface SourceConfig {
   heading: string;
@@ -128,6 +128,16 @@ const SOURCES: Record<ListSource, SourceConfig> = {
     emptyIcon: 'pi-users',
     emptyTitle: 'No team requests yet',
     emptyBody: 'Requests raised by people who report to you will appear here.',
+    emptyAction: '',
+  },
+  handled: {
+    heading: 'Handled by me',
+    errorText: 'We could not load the requests you handled. Try again.',
+    showNewRequest: false,
+    showRequester: true,
+    emptyIcon: 'pi-check-square',
+    emptyTitle: 'Nothing handled yet',
+    emptyBody: 'Requests you have acted on will appear here.',
     emptyAction: '',
   },
 };
@@ -494,6 +504,8 @@ export class MyRequestsPage implements OnInit {
   protected readonly paths = ROUTE_PATHS;
   protected readonly source: ListSource = sourceOf(this.route.snapshot.data['source']);
   protected readonly config = SOURCES[this.source];
+  /** Handled requests list newest activity first; the other lists newest request first. */
+  private readonly defaultSort: SortKey = this.source === 'handled' ? 'updatedUtc' : 'requestDate';
   protected readonly pageSizes = PAGE_SIZES;
   protected readonly skeletonRows = [1, 2, 3, 4, 5, 6, 7, 8];
   protected readonly statusOptions: Option<RequestStatus>[] = STATUS_SORT_ORDER.map((s) => ({
@@ -505,7 +517,7 @@ export class MyRequestsPage implements OnInit {
     ...(Object.values(APPROVAL_STATUSES) as ApprovalStatus[]).map((a) => ({ label: a, value: a })),
   ];
 
-  protected readonly state = signal<ListState>(readState(this.route.snapshot.queryParamMap));
+  protected readonly state = signal<ListState>(readState(this.route.snapshot.queryParamMap, this.defaultSort));
   protected readonly searchText = signal(this.state().q);
   protected readonly items = signal<RequestListItem[]>([]);
   protected readonly total = signal(0);
@@ -556,7 +568,7 @@ export class MyRequestsPage implements OnInit {
 
     // The URL is the single source of truth: every change navigates, and every navigation reloads.
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
-      const next = readState(params);
+      const next = readState(params, this.defaultSort);
       this.state.set(next);
       if (next.q !== this.searchText().trim()) this.searchText.set(next.q);
       this.load();
@@ -672,7 +684,7 @@ export class MyRequestsPage implements OnInit {
       module: next.module,
       from: next.from,
       to: next.to,
-      sort: next.sort === 'requestDate' ? null : next.sort,
+      sort: next.sort === this.defaultSort ? null : next.sort,
       dir: next.dir === 'desc' ? null : next.dir,
       page: next.page > 1 ? next.page : null,
       pageSize: next.pageSize !== DEFAULT_PAGE_SIZE ? next.pageSize : null,
@@ -701,6 +713,8 @@ export class MyRequestsPage implements OnInit {
         return this.requestsApi.all(query);
       case 'team':
         return this.requestsApi.team(query);
+      case 'handled':
+        return this.requestsApi.handled(query);
       default:
         return this.requestsApi.mine(query);
     }

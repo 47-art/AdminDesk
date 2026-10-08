@@ -21,6 +21,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'My requests', path: ROUTE_PATHS.MyRequests, icon: 'pi pi-list', roles: [], requiresEmployeeProfile: true, hiddenForRoles: ROLE_GROUPS.TechnicalOnly },
   { label: 'All requests', path: ROUTE_PATHS.AllRequests, icon: 'pi pi-list-check', roles: ROLE_GROUPS.OrganisationWide, hiddenForRoles: ROLE_GROUPS.TechnicalOnly },
   { label: 'Team requests', path: ROUTE_PATHS.TeamRequests, icon: 'pi pi-sitemap', roles: ROLE_GROUPS.RequestManagers, hiddenForRoles: ROLE_GROUPS.OrganisationWide },
+  { label: 'Handled by me', path: ROUTE_PATHS.Handled, icon: 'pi pi-check-square', roles: ROLE_GROUPS.RequestHandlers, hiddenForRoles: ROLE_GROUPS.TechnicalOnly },
   { label: 'New request', path: ROUTE_PATHS.NewRequest, icon: 'pi pi-plus-circle', roles: [], requiresEmployeeProfile: true, hiddenForRoles: ROLE_GROUPS.TechnicalOnly },
   { label: 'People', path: ROUTE_PATHS.Team, icon: 'pi pi-users', roles: ROLE_GROUPS.Team },
   { label: 'Masters', path: ROUTE_PATHS.Masters, icon: 'pi pi-database', roles: ROLE_GROUPS.MasterViewers },

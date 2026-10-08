@@ -56,6 +56,11 @@ export class RequestsApi {
     return this.list('/api/requests/all', query);
   }
 
+  /** Requests the signed-in person acted on or was assigned to. */
+  handled(query: MineQuery = {}): Observable<Paged<RequestListItem>> {
+    return this.list('/api/requests/handled', query);
+  }
+
   /** Requests raised by the signed-in person's direct reports. */
   team(query: MineQuery = {}): Observable<Paged<RequestListItem>> {
     return this.list('/api/requests/team', query);

@@ -6,3 +6,4 @@ import { MyRequestsPage } from './my-requests.page';
 export const MY_REQUESTS_ROUTES: Routes = [{ path: '', component: MyRequestsPage, data: { source: 'mine' } }];
 export const ALL_REQUESTS_ROUTES: Routes = [{ path: '', component: MyRequestsPage, data: { source: 'all' } }];
 export const TEAM_REQUESTS_ROUTES: Routes = [{ path: '', component: MyRequestsPage, data: { source: 'team' } }];
+export const HANDLED_REQUESTS_ROUTES: Routes = [{ path: '', component: MyRequestsPage, data: { source: 'handled' } }];

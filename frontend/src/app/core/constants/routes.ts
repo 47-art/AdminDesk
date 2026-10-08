@@ -5,6 +5,7 @@ export const ROUTE_PATHS = {
   MyRequests: 'requests',
   AllRequests: 'all-requests',
   TeamRequests: 'team-requests',
+  Handled: 'handled',
   NewRequest: 'new',
   RequestDetail: 'request',
   Team: 'team',
