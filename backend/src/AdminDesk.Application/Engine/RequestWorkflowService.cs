@@ -276,7 +276,8 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         {
             CurrentStatus = RequestStatus.Cancelled,
             ResponsibleEmployeeId = null,
-            ResponsibleRole = null
+            ResponsibleRole = null,
+            ClosedUtc = now
         };
         await PersistRequestAsync(tx, updated, request.RowVersion, ct);
         await AppendAuditAsync(tx, request.Id, AuditEventTypes.Cancelled, actor.UserId, actor.Name, cancelRole,
@@ -427,7 +428,8 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
             ApprovalStatus = ApprovalStatus.Rejected,
             CurrentStatus = RequestStatus.Rejected,
             ResponsibleEmployeeId = null,
-            ResponsibleRole = null
+            ResponsibleRole = null,
+            ClosedUtc = now
         };
         await PersistRequestAsync(tx, rejectedRequest, request.RowVersion, ct);
         await AppendAuditAsync(tx, request.Id, AuditEventTypes.Rejected, actor.UserId, actor.Name, actorRole,
