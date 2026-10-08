@@ -1,0 +1,38 @@
+{
+  "code": "welfare",
+  "version": 1,
+  "name": "Employee welfare request",
+  "description": "Ask for a welfare item such as assistance, festival requirements, an event, a medical camp, an engagement activity or a canteen request. Admin reviews, your manager approves, Admin acts and enters the expense, and you confirm.",
+  "category": "Visitors and others",
+  "icon": "pi-heart",
+  "prefix": "WEL",
+  "subject": "Welfare: {category}",
+  "fields": [
+    {
+      "key": "category", "label": "Category", "type": "select", "required": true, "section": "Request",
+      "options": [
+        { "value": "Welfare assistance", "label": "Welfare assistance" },
+        { "value": "Festival requirements", "label": "Festival requirements" },
+        { "value": "Employee events", "label": "Employee events" },
+        { "value": "Medical camp arrangements", "label": "Medical camp arrangements" },
+        { "value": "Employee engagement activities", "label": "Employee engagement activities" },
+        { "value": "Canteen-related requests", "label": "Canteen-related requests" }
+      ]
+    },
+    { "key": "details", "label": "Details", "type": "longText", "required": true, "maxLength": 1000, "fullWidth": true, "section": "Request" }
+  ],
+  "steps": [
+    { "key": "admin-review", "name": "Admin review", "type": "approval", "actor": { "roles": ["Admin"] } },
+    { "key": "approval", "name": "Approval", "type": "approval", "actor": { "reportingManager": true } },
+    { "key": "action", "name": "Action", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Mark action done" },
+    {
+      "key": "expense-entry", "name": "Expense entry", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Save expense",
+      "captureFields": [
+        { "key": "expenseAmount", "label": "Expense amount", "type": "money", "required": true, "min": 0 },
+        { "key": "expenseNote", "label": "Expense note", "type": "text", "maxLength": 200 }
+      ]
+    },
+    { "key": "employee-confirmation", "name": "Employee confirmation", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm" }
+  ],
+  "limits": []
+}

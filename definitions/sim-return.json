@@ -1,0 +1,28 @@
+{
+  "code": "sim-return",
+  "version": 1,
+  "name": "SIM return or transfer",
+  "description": "Return a SIM you hold, or move it to another employee. Admin verifies, the SIM is deactivated or transferred, and the SIM master is updated.",
+  "category": "Assets and equipment",
+  "icon": "pi-undo",
+  "prefix": "SRT",
+  "subject": "SIM return: {reason}",
+  "fields": [
+    { "key": "sim", "label": "SIM", "type": "lookup", "lookupKind": "heldSim", "required": true, "section": "SIM" },
+    {
+      "key": "reason", "label": "Reason", "type": "select", "required": true, "section": "SIM",
+      "options": [ { "value": "Employee exit", "label": "Employee exit" }, { "value": "Transfer", "label": "Transfer" } ]
+    },
+    {
+      "key": "transferTo", "label": "Transfer to", "type": "lookup", "lookupKind": "employee", "required": true, "section": "SIM",
+      "showWhen": { "field": "reason", "equals": "Transfer" }
+    }
+  ],
+  "steps": [
+    { "key": "sim-return", "name": "SIM return", "type": "task", "actor": { "requester": true }, "actionLabel": "Return SIM" },
+    { "key": "admin-verification", "name": "Admin verification", "type": "approval", "actor": { "roles": ["Admin"] } },
+    { "key": "telecom-deactivation", "name": "Telecom deactivation or transfer", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Deactivate or transfer" },
+    { "key": "sim-master-update", "name": "SIM master update", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Update SIM master" }
+  ],
+  "limits": []
+}

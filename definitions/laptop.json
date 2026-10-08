@@ -1,0 +1,38 @@
+{
+  "code": "laptop",
+  "version": 1,
+  "name": "Laptop or IT asset request",
+  "description": "Ask for a laptop, desktop or other IT asset. A manager approves, IT or Admin verifies (and Finance approves when a cost above the limit is involved), then the asset is allocated, you acknowledge it and the asset master is updated.",
+  "category": "Assets and equipment",
+  "icon": "pi-desktop",
+  "prefix": "LAP",
+  "subject": "{assetType} request",
+  "fields": [
+    {
+      "key": "assetType", "label": "Asset type", "type": "select", "required": true, "section": "Requirement",
+      "options": [ { "value": "Laptop", "label": "Laptop" }, { "value": "Desktop", "label": "Desktop" }, { "value": "Other IT asset", "label": "Other IT asset" } ]
+    },
+    { "key": "requirement", "label": "Asset requirement", "type": "longText", "required": true, "maxLength": 500, "fullWidth": true, "section": "Requirement" },
+    { "key": "estimatedCost", "label": "Cost, if a payment is involved", "type": "money", "min": 0, "section": "Cost" }
+  ],
+  "steps": [
+    { "key": "manager-approval", "name": "Manager approval", "type": "approval", "actor": { "reportingManager": true } },
+    { "key": "it-admin-verification", "name": "IT or Admin verification", "type": "approval", "actor": { "roles": ["IT", "Admin"] } },
+    {
+      "key": "finance-approval", "name": "Finance approval", "type": "approval", "actor": { "roles": ["Finance"] },
+      "condition": { "field": "estimatedCost", "op": "gt", "limit": "finance-limit" }
+    },
+    { "key": "asset-availability", "name": "Asset availability", "type": "task", "actor": { "roles": ["IT", "Admin"] }, "actionLabel": "Confirm an asset is available" },
+    {
+      "key": "asset-allocation", "name": "Asset allocation", "type": "task", "actor": { "roles": ["IT", "Admin"] }, "actionLabel": "Allocate asset",
+      "captureFields": [
+        { "key": "asset", "label": "Asset to allocate", "type": "lookup", "lookupKind": "availableAsset", "required": true }
+      ]
+    },
+    { "key": "employee-acknowledgement", "name": "Employee acknowledgement", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm I received the asset" },
+    { "key": "asset-master-update", "name": "Asset master update", "type": "task", "actor": { "roles": ["IT", "Admin"] }, "actionLabel": "Update asset master" }
+  ],
+  "limits": [
+    { "stepKey": "finance-approval", "limitKey": "finance-limit", "valueMinor": 0, "unit": "INR" }
+  ]
+}

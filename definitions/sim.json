@@ -1,0 +1,44 @@
+{
+  "code": "sim",
+  "version": 1,
+  "name": "SIM request",
+  "description": "Ask for a new SIM, a replacement or a transfer. A manager approves, Admin verifies (and Finance approves when a payment above the limit is involved), then Admin allocates the SIM, you acknowledge it, the telecom activation is recorded and the SIM master is updated.",
+  "category": "Assets and equipment",
+  "icon": "pi-mobile",
+  "prefix": "SIM",
+  "subject": "SIM: {requestType}",
+  "fields": [
+    {
+      "key": "requestType", "label": "Request type", "type": "select", "required": true, "section": "Request",
+      "options": [ { "value": "New SIM", "label": "New SIM" }, { "value": "Replacement", "label": "Replacement" }, { "value": "Transfer", "label": "Transfer" } ]
+    },
+    { "key": "reason", "label": "Reason", "type": "longText", "required": true, "maxLength": 500, "fullWidth": true, "section": "Request" },
+    { "key": "estimatedCost", "label": "Cost, if a payment is involved", "type": "money", "min": 0, "section": "Cost" }
+  ],
+  "steps": [
+    { "key": "manager-approval", "name": "Approval", "type": "approval", "actor": { "reportingManager": true } },
+    { "key": "admin-verification", "name": "Admin verification", "type": "approval", "actor": { "roles": ["Admin"] } },
+    {
+      "key": "finance-approval", "name": "Finance approval", "type": "approval", "actor": { "roles": ["Finance"] },
+      "condition": { "field": "estimatedCost", "op": "gt", "limit": "finance-limit" }
+    },
+    { "key": "sim-availability", "name": "SIM availability", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Confirm a SIM is available" },
+    {
+      "key": "sim-allocation", "name": "SIM allocation", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Allocate SIM",
+      "captureFields": [
+        { "key": "sim", "label": "SIM to allocate", "type": "lookup", "lookupKind": "availableSim", "required": true }
+      ]
+    },
+    { "key": "employee-acknowledgement", "name": "Employee acknowledgement", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm I received the SIM" },
+    {
+      "key": "telecom-activation", "name": "Telecom activation", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Record activation",
+      "captureFields": [
+        { "key": "activationDate", "label": "Activation date", "type": "date", "required": true }
+      ]
+    },
+    { "key": "sim-master-update", "name": "SIM master update", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Update SIM master" }
+  ],
+  "limits": [
+    { "stepKey": "finance-approval", "limitKey": "finance-limit", "valueMinor": 0, "unit": "INR" }
+  ]
+}

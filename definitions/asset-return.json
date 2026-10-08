@@ -1,0 +1,39 @@
+{
+  "code": "asset-return",
+  "version": 1,
+  "name": "Asset return",
+  "description": "Return a laptop or IT asset you hold, on transfer or exit. IT or Admin verifies it physically and checks its condition; a damage or loss cost is recorded only when it is damaged or lost; Admin gives clearance and the asset master is updated.",
+  "category": "Assets and equipment",
+  "icon": "pi-replay",
+  "prefix": "ART",
+  "subject": "Asset return: {reason}",
+  "fields": [
+    { "key": "asset", "label": "Asset", "type": "lookup", "lookupKind": "heldAsset", "required": true, "section": "Asset" },
+    {
+      "key": "reason", "label": "Reason", "type": "select", "required": true, "section": "Asset",
+      "options": [ { "value": "Transfer", "label": "Transfer" }, { "value": "Exit", "label": "Exit" } ]
+    }
+  ],
+  "steps": [
+    { "key": "physical-verification", "name": "Physical verification", "type": "approval", "actor": { "roles": ["IT", "Admin"] } },
+    {
+      "key": "condition-check", "name": "Condition check", "type": "task", "actor": { "roles": ["IT", "Admin"] }, "actionLabel": "Record condition",
+      "captureFields": [
+        {
+          "key": "condition", "label": "Condition", "type": "select", "required": true,
+          "options": [ { "value": "Good", "label": "Good" }, { "value": "Damaged", "label": "Damaged" }, { "value": "Lost", "label": "Lost" } ]
+        }
+      ]
+    },
+    {
+      "key": "damage-loss-calculation", "name": "Damage or loss calculation", "type": "task", "actor": { "roles": ["IT", "Admin"] }, "actionLabel": "Record damage or loss cost",
+      "condition": { "field": "condition-check.condition", "op": "in", "value": ["Damaged", "Lost"] },
+      "captureFields": [
+        { "key": "damageCost", "label": "Damage or loss cost", "type": "money", "required": true, "min": 0 }
+      ]
+    },
+    { "key": "clearance", "name": "Clearance", "type": "approval", "actor": { "roles": ["Admin"] } },
+    { "key": "asset-master-update", "name": "Asset master update", "type": "task", "actor": { "roles": ["IT", "Admin"] }, "actionLabel": "Update asset master" }
+  ],
+  "limits": []
+}

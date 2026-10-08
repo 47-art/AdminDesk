@@ -1,0 +1,38 @@
+{
+  "code": "housekeeping",
+  "version": 1,
+  "name": "Housekeeping request",
+  "description": "Raise a housekeeping request or complaint for a location. Admin assigns it, housekeeping acts, Admin records completion and you confirm.",
+  "category": "Facilities",
+  "icon": "pi-sparkles",
+  "prefix": "HKP",
+  "subject": "Housekeeping: {category}",
+  "fields": [
+    { "key": "location", "label": "Location", "type": "lookup", "lookupKind": "location", "required": true, "section": "Location" },
+    { "key": "area", "label": "Floor or area", "type": "text", "maxLength": 100, "section": "Location" },
+    {
+      "key": "category", "label": "Issue category", "type": "select", "required": true, "section": "Issue",
+      "options": [
+        { "value": "Cleaning", "label": "Cleaning" },
+        { "value": "Drinking Water", "label": "Drinking Water" },
+        { "value": "Pantry", "label": "Pantry" },
+        { "value": "Washroom", "label": "Washroom" },
+        { "value": "Office Maintenance", "label": "Office Maintenance" },
+        { "value": "Waste Management", "label": "Waste Management" }
+      ]
+    },
+    { "key": "description", "label": "Description", "type": "longText", "required": true, "maxLength": 1000, "fullWidth": true, "section": "Issue" }
+  ],
+  "steps": [
+    {
+      "key": "admin-assignment", "name": "Admin assignment", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Assign",
+      "captureFields": [
+        { "key": "assignedTo", "label": "Assigned to", "type": "text", "required": true, "maxLength": 100 }
+      ]
+    },
+    { "key": "housekeeping-action", "name": "Housekeeping action", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Mark action done" },
+    { "key": "completion", "name": "Completion", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Mark as completed" },
+    { "key": "employee-confirmation", "name": "Employee confirmation", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm" }
+  ],
+  "limits": []
+}

@@ -1,6 +1,6 @@
 # Module definitions
 
-Every request type (a module) is one JSON file in the `definitions/` folder. Adding or changing a process means adding or editing a file; no code changes. The shipped files are `definitions/stationery.json` and `definitions/courier.json`.
+Every request type (a module) is one JSON file in the `definitions/` folder. Adding or changing a process means adding or editing a file; no code changes. The shipped files are in `definitions/`: stationery, courier, SIM, SIM return, laptop, asset return, ID card, welfare and housekeeping.
 
 ## File format
 
@@ -40,7 +40,20 @@ Every request type (a module) is one JSON file in the `definitions/` folder. Add
 
 `text`, `longText`, `number`, `money`, `date`, `dateTime`, `yesNo`, `select`, `multiSelect` and `lookup`. Common properties: `key`, `label`, `type`, `required`, `section` (the heading it is grouped under) and `fullWidth`. Text accepts `maxLength`; number and money accept `min` and `max`; `select` and `multiSelect` take an `options` list of `value` and `label`; `lookup` takes a `lookupKind`.
 
-Lookup kinds are registered in code. Five exist today: `employee`, `department`, `project`, `location` and `costCentre`.
+Lookup kinds are registered in code. Nine exist: `employee`, `department`, `project`, `location` and `costCentre`, plus four that read the SIM and asset masters:
+
+- `availableSim` and `availableAsset` list items that are free to allocate,
+- `heldSim` and `heldAsset` list the items currently held by the person raising the request.
+
+### Showing a field only for some answers
+
+A field (or a captured field) may carry `showWhen`, naming an earlier field in the same list and the value it must have:
+
+```json
+{ "key": "reason", "label": "Reason", "type": "longText", "required": true, "showWhen": { "field": "requestType", "equals": "Replacement" } }
+```
+
+While the other field holds a different value the field is not shown, not required and not checked; if a client sends it anyway the server ignores it and does not store it. The named field must come before it in the list. The comparison works for select, yes/no and text values.
 
 Money is written in rupees in requests and in rule values (for example `12.50`) and is held internally as whole paise. Limits are written in paise as `valueMinor`.
 

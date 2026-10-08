@@ -1,0 +1,43 @@
+{
+  "code": "id-card",
+  "version": 1,
+  "name": "ID card request",
+  "description": "Ask for a new ID card on joining, or a replacement. HR verifies the details, Admin prints the card and hands it over, you acknowledge it and the ID card master is updated.",
+  "category": "Visitors and others",
+  "icon": "pi-id-card",
+  "prefix": "IDC",
+  "subject": "ID card: {requestType}",
+  "fields": [
+    {
+      "key": "requestType", "label": "Request type", "type": "select", "required": true, "section": "Request",
+      "options": [ { "value": "Joining", "label": "Joining" }, { "value": "Replacement", "label": "Replacement" } ]
+    },
+    {
+      "key": "details", "label": "Employee details for the card", "type": "longText", "maxLength": 500, "fullWidth": true, "section": "Request",
+      "helpText": "Name and designation as they should appear on the card. Attach your photo as a document on the request."
+    },
+    {
+      "key": "reason", "label": "Reason for replacement", "type": "longText", "required": true, "maxLength": 500, "fullWidth": true, "section": "Replacement",
+      "showWhen": { "field": "requestType", "equals": "Replacement" }
+    },
+    {
+      "key": "oldCardStatus", "label": "Old ID card status", "type": "select", "required": true, "section": "Replacement",
+      "options": [ { "value": "Lost", "label": "Lost" }, { "value": "Damaged", "label": "Damaged" }, { "value": "Expired", "label": "Expired" }, { "value": "Other", "label": "Other" } ],
+      "showWhen": { "field": "requestType", "equals": "Replacement" }
+    }
+  ],
+  "steps": [
+    { "key": "hr-verification", "name": "HR verification", "type": "approval", "actor": { "roles": ["HR"] } },
+    {
+      "key": "admin-printing", "name": "Admin printing", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Record printed card",
+      "captureFields": [
+        { "key": "newCardNumber", "label": "New ID card number", "type": "text", "required": true, "maxLength": 40 },
+        { "key": "replacementCost", "label": "Replacement cost, if applicable", "type": "money", "min": 0 }
+      ]
+    },
+    { "key": "employee-handover", "name": "Employee handover", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Mark as handed over" },
+    { "key": "acknowledgement", "name": "Acknowledgement", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm I received the card" },
+    { "key": "id-card-master-update", "name": "ID card master update", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Update ID card master" }
+  ],
+  "limits": []
+}
