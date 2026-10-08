@@ -62,7 +62,7 @@ Stationery, from submission to closure:
 
 Courier: raise a Courier request as the Employee. As Admin, select the courier (entering the courier company), mark it dispatched and save the tracking number. As the requester, confirm delivery. The request closes and the timeline shows the courier company and the tracking number.
 
-Reject and Cancel both need a reason. The Manager can reject at an approval step; the requester can cancel at any time while the request is in progress.
+Reject and Cancel both need a reason. The Manager can reject at an approval step; the requester can cancel while the request is in progress, until the step that hands over the item is done (Issue material for stationery, Dispatch for courier). After that Cancel is no longer offered.
 
 ## How a module is defined
 
@@ -116,7 +116,7 @@ The table keeps App events for `Logging:Db:RetentionDays:App` days (default 30) 
 The process description leaves some things open. What was chosen:
 
 1. The workflow model is deliberately small: two step kinds, approval and task; four request statuses (In progress, Closed, Rejected and Cancelled); three approval statuses (Pending, Approved and Rejected). While a request is in progress, the name of the current step is the status shown. There is no draft, no editing after creating and no comment thread. Reject and Cancel, both with a reason, are not described in the process description and were added as the smallest possible rule set.
-2. Cancel is allowed at any time while the request is in progress, by the requester, and always with a reason.
+2. Cancel is allowed while the request is in progress, by the requester, and always with a reason, until the step that hands over the item is done (Issue material for stationery, Dispatch for courier); after that Cancel is no longer offered and the server refuses it. The lock is read from the definition version the request was created with, so a request raised before that version keeps the old rule.
 3. Visibility: a request can be opened by its requester, by anyone who has acted on it or is asked to act on it, and by Admin and System admin.
 4. Role changes apply at the next sign-in.
 5. A step's actors may be a list of roles; anyone holding one of them can act.
