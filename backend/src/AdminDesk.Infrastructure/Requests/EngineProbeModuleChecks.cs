@@ -101,6 +101,16 @@ internal sealed class EngineProbeModuleChecks
     {
         var request = await _k.RequestAsync(id);
         _k.Check(request.CurrentStatus == "Closed" && request.ClosedUtc is not null, $"{what}: the request is {request.CurrentStatus}, expected Closed");
+        // Every closed request must also read back as the page does after the last step.
+        try
+        {
+            using var scope = _k.Services.CreateScope();
+            await scope.ServiceProvider.GetRequiredService<IRequestQueryService>().GetDetailAsync(_k.Admin, id, default);
+        }
+        catch (Exception exception)
+        {
+            _k.Check(false, $"{what}: reading the closed request failed: {exception.Message}");
+        }
     }
 
     private Task<ProbeMasterRow> SimRowAsync(long id) =>
