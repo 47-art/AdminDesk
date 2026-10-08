@@ -7,6 +7,7 @@ import {
   inject,
   input,
   signal,
+  viewChild,
 } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NgControl } from '@angular/forms';
 import { AutoComplete, AutoCompleteCompleteEvent } from 'primeng/autocomplete';
@@ -16,7 +17,6 @@ import { LookupsApi } from '../../core/api/lookups.api';
 
 /** Wait this long after the last keystroke before asking the server. */
 export const LOOKUP_DEBOUNCE_MS = 300;
-export const LOOKUP_MIN_CHARS = 2;
 export const LOOKUP_EMPTY_TEXT = 'No matches. Try a different name or code.';
 
 /**
@@ -46,6 +46,7 @@ export const LOOKUP_EMPTY_TEXT = 'No matches. Try a different name or code.';
   `,
   template: `
     <p-autocomplete
+      #ac
       styleClass="w-full"
       [inputStyle]="{ width: '100%' }"
       [style]="{ width: '100%' }"
@@ -55,7 +56,8 @@ export const LOOKUP_EMPTY_TEXT = 'No matches. Try a different name or code.';
       [suggestions]="suggestions()"
       [dropdown]="true"
       [forceSelection]="true"
-      [minLength]="minChars"
+      [minLength]="0"
+      [completeOnFocus]="true"
       [delay]="debounceMs"
       [showEmptyMessage]="true"
       [emptyMessage]="emptyText"
@@ -64,6 +66,7 @@ export const LOOKUP_EMPTY_TEXT = 'No matches. Try a different name or code.';
       [ngModel]="selected()"
       (ngModelChange)="onModelChange($event)"
       (completeMethod)="search($event)"
+      (onInputKeydown)="onKeydown($event)"
     >
       <ng-template #item let-item>
         <span class="item">
@@ -90,7 +93,7 @@ export class LookupFieldComponent implements ControlValueAccessor {
   readonly describedBy = input<string | null>(null);
   readonly invalid = input<boolean>(false);
 
-  protected readonly minChars = LOOKUP_MIN_CHARS;
+  private readonly autocomplete = viewChild<AutoComplete>('ac');
   protected readonly debounceMs = LOOKUP_DEBOUNCE_MS;
   protected readonly emptyText = LOOKUP_EMPTY_TEXT;
 
@@ -101,6 +104,7 @@ export class LookupFieldComponent implements ControlValueAccessor {
   private onChange: (value: number | null) => void = () => undefined;
   private onTouched: () => void = () => undefined;
   private resolveToken = 0;
+  private searchToken = 0;
   private alive = true;
 
   constructor() {
@@ -148,15 +152,26 @@ export class LookupFieldComponent implements ControlValueAccessor {
 
   protected search(event: AutoCompleteCompleteEvent): void {
     const query = (event.query ?? '').trim();
-    // The dropdown button asks with an empty query; typed text needs the minimum length.
-    if (query.length > 0 && query.length < LOOKUP_MIN_CHARS) {
-      this.suggestions.set([]);
-      return;
-    }
+    const token = ++this.searchToken;
     this.lookups.search(this.kind(), query).subscribe({
-      next: (items) => this.suggestions.set(items),
-      error: () => this.suggestions.set([]),
+      next: (items) => {
+        // A newer request has been sent since; its answer wins.
+        if (this.alive && token === this.searchToken) this.suggestions.set(items);
+      },
+      error: () => {
+        if (this.alive && token === this.searchToken) this.suggestions.set([]);
+      },
     });
+  }
+
+  /** The arrow key opens the list when it is closed, even with nothing typed. */
+  protected onKeydown(event: { originalEvent?: Event } | KeyboardEvent): void {
+    const original = (event as { originalEvent?: Event }).originalEvent ?? (event as Event);
+    const key = (original as KeyboardEvent).key;
+    const ac = this.autocomplete();
+    if (key !== 'ArrowDown' || !ac || ac.overlayVisible || this.disabled()) return;
+    const typed = ((original.target as HTMLInputElement | null)?.value ?? '').trim();
+    ac.search(original, typed, 'dropdown');
   }
 
   protected onModelChange(value: LookupItem | string | null): void {

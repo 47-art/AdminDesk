@@ -7,7 +7,7 @@ import { LookupItem } from './models';
 export class LookupsApi {
   private readonly api = inject(ApiClient);
 
-  search(kind: string, q: string, take = 20): Observable<LookupItem[]> {
+  search(kind: string, q: string, take = 50): Observable<LookupItem[]> {
     return this.api.get<LookupItem[]>(`/api/lookups/${encodeURIComponent(kind)}`, { q, take });
   }
 
