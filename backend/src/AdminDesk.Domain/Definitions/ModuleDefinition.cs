@@ -65,6 +65,9 @@ public sealed record StepDefinition
     public RuleNode? Condition { get; init; }
     public string? ActionLabel { get; init; }
     public IReadOnlyList<FieldDefinition>? CaptureFields { get; init; }
+
+    // When true, the request can no longer be cancelled once this step is done.
+    public bool LocksCancel { get; init; }
 }
 
 // A group (Any or All) or a leaf rule (Field, Op and either Value or Limit).

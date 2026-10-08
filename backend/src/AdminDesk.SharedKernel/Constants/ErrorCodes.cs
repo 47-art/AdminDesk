@@ -9,6 +9,7 @@ public static class ErrorCodes
     public const string UNAUTHORIZED = "UNAUTHORIZED";
     public const string FORBIDDEN = "FORBIDDEN";
     public const string ACTION_NOT_ALLOWED = "ACTION_NOT_ALLOWED";
+    public const string CANCEL_LOCKED = "CANCEL_LOCKED";
     public const string NO_EMPLOYEE_PROFILE = "NO_EMPLOYEE_PROFILE";
     public const string NOT_FOUND = "NOT_FOUND";
     public const string STATE_CONFLICT = "STATE_CONFLICT";

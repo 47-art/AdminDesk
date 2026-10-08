@@ -4,6 +4,7 @@ using AdminDesk.Application.Definitions;
 using AdminDesk.Application.Engine;
 using AdminDesk.Application.Masters;
 using AdminDesk.Domain.Definitions;
+using AdminDesk.Domain.Engine;
 using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Enums;
 using AdminDesk.SharedKernel.Exceptions;
@@ -108,7 +109,8 @@ public sealed class RequestQueryService : IRequestQueryService
         StepType? currentType = current?.Type;
 
         var allowed = AllowedActionsCalculator.Compute(
-            actor, status, header.RequesterEmployeeId, currentSeq, currentType, rows.ActiveActors);
+            actor, status, header.RequesterEmployeeId, currentSeq, currentType, rows.ActiveActors,
+            TransitionRules.CancelLocked(definition.Steps, rows.Steps.Select(r => (r.StepKey, r.State))));
         var primary = AllowedActionsCalculator.PrimaryLabel(status, currentType, currentDefinition?.ActionLabel);
 
         string? cancelReason = null;

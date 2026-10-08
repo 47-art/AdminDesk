@@ -1,6 +1,6 @@
 {
   "code": "stationery",
-  "version": 1,
+  "version": 2,
   "name": "Stationery request",
   "description": "Request office stationery. A manager approves, Admin or Store verifies, then the Store checks stock, issues the items and updates stock.",
   "category": "Assets and equipment",
@@ -15,7 +15,7 @@
     { "key": "manager-approval", "name": "Manager approval", "type": "approval", "actor": { "reportingManager": true } },
     { "key": "verification", "name": "Admin or Store verification", "type": "approval", "actor": { "roles": ["Admin", "Store"] } },
     { "key": "stock-check", "name": "Stock availability", "type": "task", "actor": { "roles": ["Store"] }, "actionLabel": "Confirm stock available" },
-    { "key": "issue", "name": "Issue material", "type": "task", "actor": { "roles": ["Store"] }, "actionLabel": "Mark as issued" },
+    { "key": "issue", "name": "Issue material", "type": "task", "actor": { "roles": ["Store"] }, "actionLabel": "Mark as issued", "locksCancel": true },
     { "key": "acknowledgement", "name": "Receipt confirmation", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm I received the items" },
     { "key": "stock-update", "name": "Stock update", "type": "task", "actor": { "roles": ["Store"] }, "actionLabel": "Confirm stock updated" }
   ],

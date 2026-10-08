@@ -422,6 +422,23 @@ internal sealed class ProbeKit
         Check(ex.Code == ErrorCodes.ACTION_NOT_ALLOWED, $"{what}: expected code ACTION_NOT_ALLOWED but got {ex.Code}");
     }
 
+    // The cancel is refused with CANCEL_LOCKED and nothing about the request changes.
+    public async Task ExpectCancelLockedAsync(string what, ActorContext actor, long id, string reason)
+    {
+        var before = await RequestAsync(id);
+        var actorsBefore = await ActiveActorCountAsync(id);
+        var cancelledEventsBefore = await ScalarAsync<long>(
+            "SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Cancelled'", new { Id = id });
+        var ex = await ExpectAsync<DomainRuleException>(what, () => ActAsync(actor, id, RequestAction.Cancel, reason));
+        Check(ex.Code == ErrorCodes.CANCEL_LOCKED, $"{what}: expected code CANCEL_LOCKED but got {ex.Code}");
+        var after = await RequestAsync(id);
+        Check(after.CurrentStatus == before.CurrentStatus && after.RowVersion == before.RowVersion && after.CurrentStepKey == before.CurrentStepKey,
+            $"{what}: the refused cancel changed the request");
+        Check(await ActiveActorCountAsync(id) == actorsBefore, $"{what}: the refused cancel changed the active actors");
+        Check(await ScalarAsync<long>("SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Cancelled'", new { Id = id }) == cancelledEventsBefore,
+            $"{what}: the refused cancel wrote an audit event");
+    }
+
     public async Task ExpectFieldAsync(string what, string field, Func<Task> call)
     {
         var ex = await ExpectAsync<ValidationException>(what, call);
@@ -556,19 +573,27 @@ internal sealed class CoreChecks
         await _k.ExpectAsync<ValidationException>("12: undeclared captured key",
             () => _k.ActAsync(_k.Store, c, RequestAction.Complete, null, new Dictionary<string, JsonElement> { ["extra"] = ProbeKit.Json("x") }));
 
-        // 7 cancel at the last step
+        // 7 cancel is locked once the material is issued (request c has passed the issue step)
         await _k.ExpectNotAllowedAsync("7: cancel by a non-requester", () => _k.ActAsync(_k.Admin, c, RequestAction.Cancel, "not mine"));
-        await _k.ActAsync(_k.Requester, c, RequestAction.Cancel, "  no longer needed  ");
-        var rc = await _k.RequestAsync(c);
-        _k.Check(rc.CurrentStatus == "Cancelled" && rc.ApprovalStatus == "Approved", "7: cancel at the last step failed");
-        _k.Check(await _k.ScalarAsync<long>("SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Cancelled' AND comment = 'no longer needed'", new { Id = c }) == 1,
-            "7: cancel reason was not trimmed into the audit event");
-        _k.Check(await _k.ActiveActorCountAsync(c) == 0, "7: a cancelled request still has active actors");
+        await _k.ExpectCancelLockedAsync("7: cancel after the material was issued", _k.Requester, c, "no longer needed");
+        _k.Check((await _k.RequestAsync(c)).CurrentStatus == "InProgress", "7: the locked request is not in progress");
+        await _k.ActAsync(_k.Store, c, RequestAction.Complete);
+        _k.Check((await _k.RequestAsync(c)).CurrentStatus == "Closed", "7: the locked request could not be finished");
+
+        // Cancel at the issue step itself is still allowed (the step is current, not done).
+        var issueOnly = await _k.CreateAsync(_k.Requester, "stationery", stationery);
+        await _k.AdvanceStationeryAsync(issueOnly, "issue");
+        _k.Check((await _k.RequestAsync(issueOnly)).CurrentStepKey == "issue", "7: could not reach the issue step");
+        await _k.ActAsync(_k.Requester, issueOnly, RequestAction.Cancel, "changed my mind");
+        var rIssue = await _k.RequestAsync(issueOnly);
+        _k.Check(rIssue.CurrentStatus == "Cancelled" && await _k.ActiveActorCountAsync(issueOnly) == 0, "7: cancel at the issue step failed");
 
         var f = await _k.CreateAsync(_k.Requester, "stationery", stationery);
-        await _k.ActAsync(_k.Requester, f, RequestAction.Cancel, "wrong item");
+        await _k.ActAsync(_k.Requester, f, RequestAction.Cancel, "  wrong item  ");
         var rf = await _k.RequestAsync(f);
         _k.Check(rf.CurrentStatus == "Cancelled" && rf.ApprovalStatus == "Pending" && await _k.ActiveActorCountAsync(f) == 0, "7: cancel at the first step failed");
+        _k.Check(await _k.ScalarAsync<long>("SELECT COUNT(*) FROM audit_events WHERE request_id = @Id AND event_type = 'Cancelled' AND comment = 'wrong item'", new { Id = f }) == 1,
+            "7: cancel reason was not trimmed into the audit event");
 
         var g = await _k.CreateAsync(_k.Requester, "stationery", stationery);
         await _k.AdvanceStationeryAsync(g, "stock-check");
@@ -581,7 +606,7 @@ internal sealed class CoreChecks
         await _k.ExpectNotAllowedAsync("7: cancel a closed request", () => _k.ActAsync(_k.Requester, a, RequestAction.Cancel, "too late"));
         await _k.ExpectNotAllowedAsync("7: cancel a rejected request", () => _k.ActAsync(_k.Requester, b, RequestAction.Cancel, "too late"));
         _k.Pass("5 action and step pairing");
-        _k.Pass("7 cancel at any time");
+        _k.Pass("7 cancel until the material is issued");
 
         // 8 no self-skip
         var h = await _k.CreateAsync(_k.Store, "stationery", stationery);
@@ -692,14 +717,22 @@ internal sealed class CoreChecks
             "SELECT details_json FROM audit_events WHERE request_id = @Id AND event_type = 'StepCompleted' AND details_json IS NOT NULL ORDER BY id", new { Id = d });
         _k.Check(details.SequenceEqual(new[] { selection.CapturedJson!, tracking.CapturedJson! }), "12: audit details do not carry the captured values");
 
-        // A second courier request cancelled at the very last step.
+        // Cancel is allowed at the dispatch step itself, and refused once the parcel is dispatched.
+        var atDispatch = await _k.CreateAsync(_k.Requester, "courier", courier);
+        await _k.ActAsync(_k.Admin, atDispatch, RequestAction.Complete, null, new() { ["courierCompany"] = ProbeKit.Json("Example Couriers") });
+        _k.Check((await _k.RequestAsync(atDispatch)).CurrentStepKey == "dispatch", "7: could not reach the dispatch step");
+        await _k.ActAsync(_k.Requester, atDispatch, RequestAction.Cancel, "parcel not needed");
+        var rDispatch = await _k.RequestAsync(atDispatch);
+        _k.Check(rDispatch.CurrentStatus == "Cancelled" && await _k.ActiveActorCountAsync(atDispatch) == 0, "7: cancel at the courier dispatch step failed");
+
         var e = await _k.CreateAsync(_k.Requester, "courier", courier);
         await _k.ActAsync(_k.Admin, e, RequestAction.Complete, null, new() { ["courierCompany"] = ProbeKit.Json("Example Couriers") });
         await _k.ActAsync(_k.Admin, e, RequestAction.Complete);
+        await _k.ExpectCancelLockedAsync("7: cancel after dispatch (tracking step)", _k.Requester, e, "parcel not needed");
         await _k.ActAsync(_k.Admin, e, RequestAction.Complete, null, new() { ["trackingNumber"] = ProbeKit.Json("TRK999") });
-        await _k.ActAsync(_k.Requester, e, RequestAction.Cancel, "parcel not needed");
-        var re = await _k.RequestAsync(e);
-        _k.Check(re.CurrentStatus == "Cancelled" && await _k.ActiveActorCountAsync(e) == 0, "7: cancel at the courier delivery confirmation failed");
+        await _k.ExpectCancelLockedAsync("7: cancel at the courier delivery confirmation", _k.Requester, e, "parcel not needed");
+        await _k.ActAsync(_k.Requester, e, RequestAction.Complete);
+        _k.Check((await _k.RequestAsync(e)).CurrentStatus == "Closed", "7: the locked courier request could not be finished");
         _k.Pass("12 captured values");
     }
 

@@ -14,7 +14,8 @@ public static class AllowedActionsCalculator
         long requesterEmployeeId,
         int? currentStepSeq,
         StepType? currentStepType,
-        IReadOnlyList<ActorRow> activeActors)
+        IReadOnlyList<ActorRow> activeActors,
+        bool cancelLocked = false)
     {
         if (!RequestWorkflowService.ActionableStatuses.Contains(status))
         {
@@ -37,7 +38,7 @@ public static class AllowedActionsCalculator
             }
         }
 
-        if (viewer.EmployeeId is { } employeeId && employeeId == requesterEmployeeId && TransitionRules.CanCancel(status))
+        if (viewer.EmployeeId is { } employeeId && employeeId == requesterEmployeeId && TransitionRules.CanCancel(status) && !cancelLocked)
         {
             allowed.Add(RequestAction.Cancel);
         }

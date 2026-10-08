@@ -27,6 +27,15 @@ public static class TransitionRules
     // The requester may cancel at any step while the request is in progress.
     public static bool CanCancel(RequestStatus status) => status == RequestStatus.InProgress;
 
+    // True when a step flagged as locking cancellation has been completed.
+    public static bool CancelLocked(
+        IEnumerable<AdminDesk.Domain.Definitions.StepDefinition> definitionSteps,
+        IEnumerable<(string Key, StepState State)> stepStates)
+    {
+        var locking = definitionSteps.Where(d => d.LocksCancel).Select(d => d.Key).ToHashSet();
+        return locking.Count > 0 && stepStates.Any(s => s.State == StepState.Done && locking.Contains(s.Key));
+    }
+
     // Approve and reject belong to approval steps, complete to task steps. Cancel is not tied to a step.
     public static bool CanAct(StepType stepType, RequestAction action) => action switch
     {

@@ -253,6 +253,15 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
             throw NotAllowed();
         }
 
+        var issued = await _definitions.GetByIdAsync(request.DefinitionId, ct)
+            ?? throw new InvalidOperationException($"Definition {request.DefinitionId} of request {request.Id} is missing.");
+        var stepRows = await _requests.GetStepsAsync(tx, request.Id, ct);
+        if (TransitionRules.CancelLocked(issued.Definition.Steps, stepRows.Select(r => (r.StepKey, r.State))))
+        {
+            throw new DomainRuleException(ErrorCodes.CANCEL_LOCKED,
+                "This request can no longer be cancelled because it has already moved past the point where cancelling is allowed.");
+        }
+
         await _requests.DeactivateActorsAsync(tx, request.Id, ct);
         var updated = request with
         {

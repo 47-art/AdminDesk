@@ -1,6 +1,6 @@
 {
   "code": "courier",
-  "version": 1,
+  "version": 2,
   "name": "Courier request",
   "description": "Send a document or parcel by courier. Admin selects the courier, dispatches it and records the tracking number; the requester confirms delivery.",
   "category": "Visitors and others",
@@ -22,7 +22,7 @@
         { "key": "courierCompany", "label": "Courier company", "type": "text", "required": true, "maxLength": 80 }
       ]
     },
-    { "key": "dispatch", "name": "Dispatch", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Mark as dispatched" },
+    { "key": "dispatch", "name": "Dispatch", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Mark as dispatched", "locksCancel": true },
     {
       "key": "tracking-number", "name": "Tracking number", "type": "task", "actor": { "roles": ["Admin"] },
       "actionLabel": "Save tracking number",

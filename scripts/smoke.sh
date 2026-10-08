@@ -345,6 +345,8 @@ main_mode() {
   act "$R1" "$T_STORE" Complete
   assert_status "stationery: stock confirmed" 200
 
+  detail "$R1" "$T_EMP"
+  assert_eq "cancel lock: at the issue step the requester may still cancel" "$(jget 'd.data.allowedActions.join(",")')" Cancel
   ROW=$(inbox_find "$R1" "$T_STORE")
   assert_eq "inbox: issue step label is Mark as issued" "$(jx "$ROW" d.primaryActionLabel)" "Mark as issued"
   act "$R1" "$T_STORE" Complete
@@ -352,7 +354,7 @@ main_mode() {
 
   # The receipt confirmation is a task whose actor is the requester.
   detail "$R1" "$T_EMP"; RV=$(jget d.data.rowVersion)
-  assert_eq "receipt: requester is offered exactly Complete and Cancel" "$(jget 'd.data.allowedActions.join(",")')" "Complete,Cancel"
+  assert_eq "receipt: once issued, the requester is offered Complete only" "$(jget 'd.data.allowedActions.join(",")')" Complete
   assert_eq "receipt: primary action label" "$(jget d.data.primaryActionLabel)" "Confirm I received the items"
   ROW=$(inbox_find "$R1" "$T_EMP")
   assert_eq "receipt: the request is in the requester's own inbox" "$(jx "$ROW" d.currentStepType)" Task
@@ -373,8 +375,9 @@ main_mode() {
       "$(dbval "SELECT actor_name FROM audit_events WHERE request_id = $R1 AND event_type = 'StepCompleted' AND step_key = 'acknowledgement'")" "Priya Nair"
   fi
 
-  # The last step: the requester can still cancel, the store closes the request.
-  assert_eq "stock update: requester is offered exactly Cancel" "$(jget 'd.data.allowedActions.join(",")')" Cancel
+  # The last step: Cancel is gone, the store closes the request.
+  detail "$R1" "$T_EMP"
+  assert_eq "stock update: requester is offered nothing" "$(jget 'd.data.allowedActions.length')" 0
   ROW=$(inbox_find "$R1" "$T_STORE")
   assert_eq "inbox: stock update label" "$(jx "$ROW" d.primaryActionLabel)" "Confirm stock updated"
   act "$R1" "$T_STORE" Complete
@@ -419,15 +422,25 @@ main_mode() {
   act_rv "$R1" "$T_EMP" Cancel "$RV" '"Too late"'
   assert_error "cancel: a Closed request gets 403 ACTION_NOT_ALLOWED" 403 ACTION_NOT_ALLOWED
 
-  # Cancel at the last step: there is no cutoff.
+  # Cancel is refused once the material has been issued.
   create "$T_EMP" "$(stn_body Folders 3)"; R3=$RID
   walk_stationery_to_receipt "$R3"
+  detail "$R3" "$T_EMP"; RV=$(jget d.data.rowVersion)
+  assert_eq "cancel lock: after issue Cancel is not offered" "$(jget 'd.data.allowedActions.join(",")')" Complete
+  act_rv "$R3" "$T_EMP" Cancel "$RV" '"Not needed any more"'
+  assert_error "cancel lock: Cancel after issue gets 422 CANCEL_LOCKED" 422 CANCEL_LOCKED
+  detail "$R3" "$T_EMP"
+  assert_eq "cancel lock: refused cancel leaves the request unchanged" "$(jget d.data.currentStatus)/$(jget d.data.rowVersion)" "InProgress/$RV"
+  if [ -n "${DB_PATH-}" ]; then
+    assert_eq "cancel lock: no Cancelled audit event was written"       "$(dbval "SELECT COUNT(*) FROM audit_events WHERE request_id = $R3 AND event_type = 'Cancelled'")" 0
+  fi
   act "$R3" "$T_EMP" Complete
-  assert_status "cancel at last step: receipt confirmed" 200
-  assert_eq "cancel at last step: now at stock-update" "$(jget d.data.currentStepKey)" stock-update
-  act "$R3" "$T_EMP" Cancel '"Not needed any more"'
-  assert_status "cancel at last step: requester cancels" 200
-  assert_eq "cancel at last step: status Cancelled" "$(jget d.data.currentStatus)" Cancelled
+  assert_status "cancel lock: receipt confirmed" 200
+  detail "$R3" "$T_EMP"; RV=$(jget d.data.rowVersion)
+  act_rv "$R3" "$T_EMP" Cancel "$RV" '"Still not needed"'
+  assert_error "cancel lock: Cancel at the last step gets 422 CANCEL_LOCKED" 422 CANCEL_LOCKED
+  act "$R3" "$T_STORE" Complete
+  assert_eq "cancel lock: the locked request can still be finished" "$(jget d.data.currentStatus)" Closed
 
   # A Cancel by someone other than the requester.
   create "$T_EMP" "$(stn_body Staplers 2)"; R4=$RID; N4=$RNO
@@ -544,8 +557,19 @@ main_mode() {
 
   detail "$C1" "$T_ADM"
   assert_eq "courier: dispatch label" "$(jget d.data.primaryActionLabel)" "Mark as dispatched"
+  detail "$C1" "$T_EMP"
+  assert_eq "cancel lock: at the dispatch step the requester may still cancel" "$(jget 'd.data.allowedActions.join(",")')" Cancel
   act "$C1" "$T_ADM" Complete
   assert_status "courier: dispatched" 200
+  detail "$C1" "$T_EMP"; RV=$(jget d.data.rowVersion)
+  assert_eq "cancel lock: after dispatch Cancel is not offered" "$(jget 'd.data.allowedActions.length')" 0
+  act_rv "$C1" "$T_EMP" Cancel "$RV" '"Changed my mind"'
+  assert_error "cancel lock: Cancel after dispatch gets 422 CANCEL_LOCKED" 422 CANCEL_LOCKED
+  detail "$C1" "$T_EMP"
+  assert_eq "cancel lock: refused courier cancel leaves the request unchanged" "$(jget d.data.currentStatus)/$(jget d.data.rowVersion)" "InProgress/$RV"
+  if [ -n "${DB_PATH-}" ]; then
+    assert_eq "cancel lock: no Cancelled audit event on the courier request"       "$(dbval "SELECT COUNT(*) FROM audit_events WHERE request_id = $C1 AND event_type = 'Cancelled'")" 0
+  fi
 
   act "$C1" "$T_ADM" Complete null null
   assert_field_error "courier: tracking number missing gets 400 on trackingNumber" trackingNumber
@@ -561,7 +585,7 @@ main_mode() {
   assert_eq "courier: tracking number on its step" "$(jget 'd.data.steps[2].captured.trackingNumber')" TRK123456
 
   detail "$C1" "$T_EMP"; RV=$(jget d.data.rowVersion)
-  assert_eq "courier: requester is offered exactly Complete and Cancel" "$(jget 'd.data.allowedActions.join(",")')" "Complete,Cancel"
+  assert_eq "courier: requester is offered Complete only at the delivery confirmation" "$(jget 'd.data.allowedActions.join(",")')" Complete
   assert_eq "courier: delivery label" "$(jget d.data.primaryActionLabel)" "Confirm delivery"
   act_rv "$C1" "$T_EMP" Approve "$RV"
   assert_error "courier: Approve at a task step gets 403" 403 ACTION_NOT_ALLOWED
