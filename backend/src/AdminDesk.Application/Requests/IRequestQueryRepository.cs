@@ -80,6 +80,7 @@ public sealed class AuditRow
     public string ActorName { get; set; } = string.Empty;
     public string? ActorRole { get; set; }
     public string? StepKey { get; set; }
+    public string? StepName { get; set; }
     public string? FromStatus { get; set; }
     public string? ToStatus { get; set; }
     public string? Comment { get; set; }

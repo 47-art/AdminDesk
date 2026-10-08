@@ -84,6 +84,7 @@ public sealed record AuditEventDto(
     string ActorName,
     string? ActorRole,
     string? StepKey,
+    string? StepName,
     string? FromStatus,
     string? ToStatus,
     string? Comment,

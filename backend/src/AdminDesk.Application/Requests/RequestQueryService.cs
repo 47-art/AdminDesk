@@ -171,7 +171,7 @@ public sealed class RequestQueryService : IRequestQueryService
         var rows = await _repository.ListAuditAsync(id, ct);
         return rows
             .Select(r => new AuditEventDto(
-                r.Id, r.EventType, r.ActorName, r.ActorRole, r.StepKey, r.FromStatus, r.ToStatus, r.Comment, r.CreatedUtc))
+                r.Id, r.EventType, r.ActorName, r.ActorRole, r.StepKey, r.StepName, r.FromStatus, r.ToStatus, r.Comment, r.CreatedUtc))
             .ToList();
     }
 

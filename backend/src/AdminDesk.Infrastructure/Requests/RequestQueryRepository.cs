@@ -279,9 +279,11 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
 
     public async Task<IReadOnlyList<AuditRow>> ListAuditAsync(long requestId, CancellationToken ct)
     {
-        const string sql =
+        // The step's display name comes from the request's own step rows; events without a step get null.
+        var sql =
             "SELECT e.id AS Id, e.event_type AS EventType, e.actor_name AS ActorName, e.actor_role AS ActorRole, " +
-            "e.step_key AS StepKey, e.from_status AS FromStatus, e.to_status AS ToStatus, e.comment AS Comment, " +
+            "e.step_key AS StepKey, (SELECT s.name FROM request_steps s WHERE s.request_id = e.request_id " +
+            "AND s.step_key = e.step_key ORDER BY s.seq " + _dialect.LimitOffset("1", "0") + ") AS StepName, e.from_status AS FromStatus, e.to_status AS ToStatus, e.comment AS Comment, " +
             "e.created_utc AS CreatedUtc FROM audit_events e WHERE e.request_id = @Id ORDER BY e.id";
 
         await using var connection = await _factory.OpenAsync(ct);

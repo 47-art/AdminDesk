@@ -523,6 +523,8 @@ main_mode() {
   assert_contains "audit: includes StepApproved" "$EVENTS" StepApproved
   assert_contains "audit: includes StepCompleted" "$EVENTS" StepCompleted
   assert_true "audit: events are in order" "$(jget 'd.data.every((e, i) => i === 0 || d.data[i - 1].id < e.id)')"
+  assert_true "audit: an approval event names its step"     "$(jget 'd.data.filter(e => e.eventType === "StepApproved").every(e => typeof e.stepName === "string" && e.stepName.length > 0 && e.stepName !== e.stepKey)')"
+  assert_true "audit: the Created event has no step name" "$(jget 'd.data[0].stepName === null || d.data[0].stepName === undefined')"
   call GET "/api/requests/$R1/audit" "$T_SYS"
   assert_status "audit: sysadmin gets 200" 200
   call GET "/api/requests/$R1/audit" "$T_EMP"
@@ -606,6 +608,16 @@ main_mode() {
   act "$C2" "$T_EMP" Cancel '"No longer needed"'
   assert_status "courier: requester cancels at courier selection" 200
   assert_eq "courier: status Cancelled" "$(jget d.data.currentStatus)" Cancelled
+
+  # ---------------------------------------------------------- cost centre
+  call GET "/api/lookups/costCentre?take=1" "$T_EMP"
+  CC_ID=$(jget 'd.data[0].id'); CC_LABEL=$(jget 'd.data[0].label')
+  assert_match "cost centre: a cost centre is available to pick" "$CC_ID" '^[0-9]+$'
+  create "$T_EMP" "$(printf '{"moduleCode":"stationery","definitionId":%s,"common":{"priority":"Medium","costCentreId":%s},"payload":{"item":"Pens","quantity":1}}' "$DEF_STN" "$CC_ID")"
+  CCR=$RID
+  assert_status "cost centre: a request with a cost centre is created" 201
+  detail "$CCR" "$T_EMP"
+  assert_eq "cost centre: the detail shows the chosen cost centre" "$(jget d.data.costCentre.label)" "$CC_LABEL"
 
   # ------------------------------------------------------- dashboard counters
   call GET /api/dashboard/summary "$T_EMP"

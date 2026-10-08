@@ -299,6 +299,11 @@ const FILTER_ABOVE_OPTIONS = 8;
               <app-field-error [id]="ids.locationId + '-error'" [message]="commonMessage('locationId')" />
             </div>
             <div class="field">
+              <div class="label-row"><label [for]="ids.costCentreId">Cost centre</label></div>
+              <app-lookup-field kind="costCentre" placeholder="Type to search" [inputId]="ids.costCentreId" [formControl]="c.controls.costCentreId" />
+              <app-field-error [id]="ids.costCentreId + '-error'" [message]="commonMessage('costCentreId')" />
+            </div>
+            <div class="field">
               <div class="label-row"><label for="common-requestDate">Request date</label></div>
               <div class="readonly" id="common-requestDate">{{ today }}</div>
             </div>
@@ -372,6 +377,7 @@ export class DynamicFormComponent {
   protected readonly ids = {
     projectId: commonDomId('projectId'),
     locationId: commonDomId('locationId'),
+    costCentreId: commonDomId('costCentreId'),
     requiredDate: commonDomId('requiredDate'),
     priority: commonDomId('priority'),
     remarks: commonDomId('remarks'),

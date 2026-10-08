@@ -4,6 +4,7 @@ import { TableModule } from 'primeng/table';
 
 import { AuditEventDto } from '../../core/api/models';
 import { RequestsApi } from '../../core/api/requests.api';
+import { AUDIT_EVENT_LABELS, STATUS_CHANGING_EVENTS } from '../../core/constants/audit-events';
 import { REQUEST_STATUS_STYLES, RequestStatus } from '../../core/constants/statuses';
 import { formatDateTime } from '../../shared/formatters/dates';
 import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.component';
@@ -66,11 +67,11 @@ import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.
           <ng-template #body let-e>
             <tr>
               <td>{{ time(e) }}</td>
-              <td>{{ e.eventType }}</td>
+              <td>{{ eventLabel(e) }}</td>
               <td>{{ actor(e) }}</td>
-              <td>{{ e.stepKey ?? '' }}</td>
-              <td>{{ statusLabel(e.fromStatus) }}</td>
-              <td>{{ statusLabel(e.toStatus) }}</td>
+              <td>{{ e.stepName ?? e.stepKey ?? '' }}</td>
+              <td>{{ statusLabel(e, e.fromStatus) }}</td>
+              <td>{{ statusLabel(e, e.toStatus) }}</td>
               <td class="comment">{{ e.comment ?? '' }}</td>
             </tr>
           </ng-template>
@@ -116,8 +117,13 @@ export class AuditTrailCardComponent implements OnInit {
     return e.actorRole ? `${e.actorName} (${e.actorRole})` : e.actorName;
   }
 
-  protected statusLabel(status: string | null): string {
-    if (!status) return '';
+  protected eventLabel(e: AuditEventDto): string {
+    return AUDIT_EVENT_LABELS[e.eventType] ?? e.eventType;
+  }
+
+  /** From and To only mean something on events that change the request status. */
+  protected statusLabel(e: AuditEventDto, status: string | null): string {
+    if (!status || !STATUS_CHANGING_EVENTS.includes(e.eventType)) return '';
     return REQUEST_STATUS_STYLES[status as RequestStatus]?.label ?? status;
   }
 }

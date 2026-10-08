@@ -224,6 +224,7 @@ export interface AuditEventDto {
   actorName: string | null;
   actorRole: string | null;
   stepKey: string | null;
+  stepName: string | null;
   fromStatus: string | null;
   toStatus: string | null;
   comment: string | null;
