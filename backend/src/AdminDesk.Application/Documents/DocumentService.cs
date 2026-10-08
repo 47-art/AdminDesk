@@ -125,7 +125,7 @@ public sealed class DocumentService : IDocumentService
         }
 
         var (name, extension) = ValidateFile(upload);
-        var step = await ValidateStepAsync(access.Request, stepKey, ct);
+        var step = await ValidateStepAsync(actor, access, stepKey, ct);
 
         var storedName = Guid.NewGuid().ToString("N") + extension;
         await _files.SaveAsync(storedName, upload.Content, ct);
@@ -323,8 +323,27 @@ public sealed class DocumentService : IDocumentService
         return name;
     }
 
-    private async Task<string?> ValidateStepAsync(RequestSnapshot request, string? stepKey, CancellationToken ct)
+    // True when the person is one of those the current step is waiting for and may act on it.
+    private static bool CanActOnCurrentStep(ActorContext actor, RequestAccess access)
     {
+        var current = access.Steps.FirstOrDefault(s => s.Seq == access.Request.CurrentStepSeq);
+        var offered = AllowedActionsCalculator.Compute(
+            actor,
+            access.Request.CurrentStatus,
+            access.Request.RequesterEmployeeId,
+            access.Request.CurrentStepSeq,
+            current?.StepType,
+            access.Actors,
+            false,
+            current?.State == StepState.Pending);
+        return offered.Contains(RequestAction.Approve) || offered.Contains(RequestAction.Complete);
+    }
+
+    // A document tagged to a step must belong to the step the request is on now, and the person uploading
+    // it must be able to act on that step. Documents without a step belong to the request as a whole.
+    private async Task<string?> ValidateStepAsync(ActorContext actor, RequestAccess access, string? stepKey, CancellationToken ct)
+    {
+        var request = access.Request;
         var key = string.IsNullOrWhiteSpace(stepKey) ? null : stepKey.Trim();
         if (key is null)
         {
@@ -335,6 +354,14 @@ public sealed class DocumentService : IDocumentService
         if (!issued.Definition.Steps.Any(s => s.Key == key))
         {
             throw new ValidationException("stepKey", "This is not a step of the request.");
+        }
+        if (key != request.CurrentStepKey)
+        {
+            throw new ValidationException("stepKey", "This is not the step the request is on now.");
+        }
+        if (!CanActOnCurrentStep(actor, access))
+        {
+            throw new ValidationException("stepKey", "Only someone who can act on this step can attach a document to it.");
         }
         return key;
     }

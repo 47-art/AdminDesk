@@ -130,6 +130,18 @@ internal sealed class EngineProbeDocumentChecks
         _k.Check(await DocumentRowCountAsync(p) == 0 && await _k.AuditCountAsync(p, AuditEventTypes.DocumentUploaded) == 0,
             "26: a refused upload left a row or an audit event");
 
+        // A document tagged to a step must be for the step the request is on, by someone who can act on it.
+        await ExpectDocumentErrorAsync("26: the requester tags a document to the proof step they cannot act on", ErrorCodes.VALIDATION_FAILED, "stepKey",
+            () => UploadAsync(_k.Requester, p, "early.pdf"));
+        var early = await _k.CreateAsync(_k.Requester, "courier", Courier);
+        await ExpectDocumentErrorAsync("26: the requester tags a document to a step that is not active yet", ErrorCodes.VALIDATION_FAILED, "stepKey",
+            () => UploadAsync(_k.Requester, early, "early.pdf"));
+        await ExpectDocumentErrorAsync("26: the admin tags a document to a step that is not active yet", ErrorCodes.VALIDATION_FAILED, "stepKey",
+            () => UploadAsync(_k.Admin, early, "early.pdf"));
+        var requestLevel = await UploadAsync(_k.Requester, early, "attachment.pdf", null, "application/pdf", null);
+        _k.Check(requestLevel.StepKey is null, "26: a request-level upload was tagged to a step");
+        _k.Check(await DocumentRowCountAsync(p) == 0, "26: a refused step-tagged upload left a row");
+
         // Read-only roles and people who cannot see the request.
         await _k.ExpectNotAllowedAsync("26: management upload", () => UploadAsync(_k.Management, p, "proof.pdf"));
         await _k.ExpectNotAllowedAsync("26: system admin upload", () => UploadAsync(_k.SysAdmin, p, "proof.pdf"));
@@ -189,10 +201,10 @@ internal sealed class EngineProbeDocumentChecks
     private async Task RemovalAndRolesAsync()
     {
         var q = await CourierAtProofAsync();
-        var byRequester = await UploadAsync(_k.Requester, q, "receipt.png", SamplePdf, "image/png");
+        var byRequester = await UploadAsync(_k.Requester, q, "receipt.png", SamplePdf, "image/png", null);
         var byAdmin = await UploadAsync(_k.Admin, q, "signed.docx", SamplePdf,
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document", null);
-        _k.Check(byRequester.StepKey == Step && byAdmin.StepKey is null, "27: the step keys were not stored as given");
+        _k.Check(byRequester.StepKey is null && byAdmin.StepKey is null, "27: the step keys were not stored as given");
 
         // Only the uploader and the Admin remove; read-only roles and outsiders do not.
         await _k.ExpectNotAllowedAsync("27: the requester removing the admin's file", () => _k.Documents.RemoveAsync(_k.Requester, q, byAdmin.Id, default));
@@ -223,7 +235,7 @@ internal sealed class EngineProbeDocumentChecks
         _k.Check(stillMissing.Code == ErrorCodes.DOCUMENT_REQUIRED, "27: removed or unrelated documents satisfied the step");
 
         // The uploader removes their own file.
-        var again = await UploadAsync(_k.Requester, q, "receipt-2.jpg", SamplePdf, "image/jpeg");
+        var again = await UploadAsync(_k.Requester, q, "receipt-2.jpg", SamplePdf, "image/jpeg", null);
         await _k.Documents.RemoveAsync(_k.Requester, q, again.Id, default);
         _k.Check((await RowAsync(again.Id)).IsActive == 0, "27: the uploader could not remove their own file");
 
