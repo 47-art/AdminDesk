@@ -13,6 +13,7 @@ import { Skeleton } from 'primeng/skeleton';
 import { TableLazyLoadEvent, TableModule } from 'primeng/table';
 import { Tab, TabList, Tabs } from 'primeng/tabs';
 import { Tag } from 'primeng/tag';
+import { ToggleSwitch } from 'primeng/toggleswitch';
 
 import { ApiError, userMessage } from '../../core/api/api-error';
 import {
@@ -145,6 +146,7 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
     TabList,
     Tab,
     Tag,
+    ToggleSwitch,
     EmptyStateComponent,
     FieldErrorComponent,
     LookupFieldComponent,
@@ -198,6 +200,21 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
     }
     .num {
       text-align: right;
+    }
+    .retired-switch {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: 14px;
+      font-weight: 400;
+    }
+    :host ::ng-deep tr.retired-row > td {
+      color: var(--p-text-muted-color);
+    }
+    .status-cell {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-xs);
     }
     .visually-hidden {
       position: absolute;
@@ -264,6 +281,12 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
         [showClear]="true"
         [attr.aria-label]="'Filter ' + spec().tab + ' by status'"
       />
+      @if (canEdit()) {
+        <label class="retired-switch">
+          <p-toggleswitch [ngModel]="showRetired()" (ngModelChange)="onShowRetired($event)" ariaLabel="Show retired" />
+          Show retired
+        </label>
+      }
       <span class="spacer"></span>
       @if (canEdit()) {
         <button pButton type="button" icon="pi pi-plus" [label]="'Add ' + spec().singular" (click)="openAdd()"></button>
@@ -281,7 +304,7 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
           <p-skeleton width="100%" height="40px" />
         }
       </div>
-    } @else if (items().length === 0 && !search().trim() && !status()) {
+    } @else if (items().length === 0 && !search().trim() && !status() && !showRetired()) {
       <app-empty-state [icon]="spec().empty.icon" [title]="spec().empty.title" [body]="spec().empty.body" />
     } @else {
       <div class="card">
@@ -335,7 +358,7 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
             </tr>
           </ng-template>
           <ng-template #body let-row>
-            <tr>
+            <tr [class.retired-row]="row.retired">
               @switch (kind()) {
                 @case (kinds.Sims) {
                   <td>{{ row.simNumber }}</td>
@@ -344,7 +367,12 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
                   <td>{{ row.plan }}</td>
                   <td>{{ dateOf(row.activationDate) }}</td>
                   <td>
-                    <p-tag [value]="statusStyle(row.status).label || row.status" [icon]="'pi ' + statusStyle(row.status).icon" [style]="tagStyle(row.status)" />
+                    <div class="status-cell">
+                      <p-tag [value]="statusStyle(row.status).label || row.status" [icon]="'pi ' + statusStyle(row.status).icon" [style]="tagStyle(row.status)" />
+                      @if (row.retired) {
+                        <p-tag value="Retired" icon="pi pi-ban" [style]="tagStyle('Deactivated')" />
+                      }
+                    </div>
                   </td>
                   <td class="num">{{ money(row.monthlyCost) }}</td>
                   <td>
@@ -361,7 +389,12 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
                   <td>{{ row.makeModel }}</td>
                   <td>{{ row.serialNumber }}</td>
                   <td>
-                    <p-tag [value]="statusStyle(row.status).label || row.status" [icon]="'pi ' + statusStyle(row.status).icon" [style]="tagStyle(row.status)" />
+                    <div class="status-cell">
+                      <p-tag [value]="statusStyle(row.status).label || row.status" [icon]="'pi ' + statusStyle(row.status).icon" [style]="tagStyle(row.status)" />
+                      @if (row.retired) {
+                        <p-tag value="Retired" icon="pi pi-ban" [style]="tagStyle('Deactivated')" />
+                      }
+                    </div>
                   </td>
                   <td>{{ row.condition ?? '' }}</td>
                   <td>
@@ -378,7 +411,12 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
                     {{ row.employeeName }}<span class="secondary">{{ row.employeeCode }}</span>
                   </td>
                   <td>
-                    <p-tag [value]="statusStyle(row.status).label || row.status" [icon]="'pi ' + statusStyle(row.status).icon" [style]="tagStyle(row.status)" />
+                    <div class="status-cell">
+                      <p-tag [value]="statusStyle(row.status).label || row.status" [icon]="'pi ' + statusStyle(row.status).icon" [style]="tagStyle(row.status)" />
+                      @if (row.retired) {
+                        <p-tag value="Retired" icon="pi pi-ban" [style]="tagStyle('Deactivated')" />
+                      }
+                    </div>
                   </td>
                   <td>{{ dateOf(row.issuedDate) }}</td>
                 }
@@ -386,7 +424,7 @@ type AnyRecord = SimRecord | AssetRecord | IdCardRecord;
               <td>
                 <div class="actions">
                   <button pButton type="button" severity="secondary" [text]="true" size="small" icon="pi pi-history" label="History" (click)="openHistory(row)"></button>
-                  @if (canEdit()) {
+                  @if (canEdit() && !row.retired) {
                     <button pButton type="button" severity="secondary" [text]="true" size="small" icon="pi pi-pencil" label="Edit" (click)="openEdit(row)"></button>
                     <button
                       pButton
@@ -571,6 +609,7 @@ export class MastersPage {
   protected readonly pageSize = signal(20);
   protected readonly search = signal('');
   protected readonly status = signal<string | null>(null);
+  protected readonly showRetired = signal(false);
   protected readonly loading = signal(true);
   protected readonly failed = signal(false);
   private debounce: ReturnType<typeof setTimeout> | null = null;
@@ -622,6 +661,7 @@ export class MastersPage {
     this.kind.set(next.kind);
     this.search.set('');
     this.status.set(null);
+    this.showRetired.set(false);
     this.page.set(1);
     this.items.set([]);
     this.total.set(0);
@@ -638,6 +678,7 @@ export class MastersPage {
       pageSize: this.pageSize(),
       search: this.search().trim() || undefined,
       status: this.status() || undefined,
+      includeRetired: this.canEdit() && this.showRetired() ? true : undefined,
     };
     const call =
       kind === MASTER_KINDS.Sims
@@ -672,6 +713,12 @@ export class MastersPage {
 
   protected onStatus(value: string | null): void {
     this.status.set(value);
+    this.page.set(1);
+    this.load();
+  }
+
+  protected onShowRetired(value: boolean): void {
+    this.showRetired.set(!!value);
     this.page.set(1);
     this.load();
   }

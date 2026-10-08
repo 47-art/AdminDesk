@@ -16,6 +16,8 @@ export interface MasterQuery {
   pageSize: number;
   search?: string;
   status?: string;
+  /** Only the master's editor roles may ask for retired records. */
+  includeRetired?: boolean;
 }
 
 export interface SimRecord {
@@ -30,6 +32,8 @@ export interface SimRecord {
   holderEmployeeId: number | null;
   holderName: string | null;
   holderCode: string | null;
+  retired: boolean;
+  retiredUtc: string | null;
 }
 
 export interface AssetRecord {
@@ -43,6 +47,8 @@ export interface AssetRecord {
   holderEmployeeId: number | null;
   holderName: string | null;
   holderCode: string | null;
+  retired: boolean;
+  retiredUtc: string | null;
 }
 
 export interface IdCardRecord {
@@ -53,6 +59,8 @@ export interface IdCardRecord {
   employeeCode: string | null;
   status: string;
   issuedDate: string;
+  retired: boolean;
+  retiredUtc: string | null;
 }
 
 export interface MasterHistoryEvent {
