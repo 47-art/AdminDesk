@@ -159,6 +159,7 @@ public sealed class EngineProbeTask : IStartupTask
             await new CoreChecks(kit).RunAsync(ct);
             await new EngineProbeRoutingChecks(kit).RunAsync(ct);
             await new EngineProbeDocumentChecks(kit).RunAsync(ct);
+            await new EngineProbeConfigChecks(kit).RunAsync(ct);
             _logger.LogInformation("ENGINE PROBE PASSED ({Count} checks)", kit.Passed);
         }
         catch (Exception ex)
@@ -225,6 +226,7 @@ internal sealed class ProbeKit
     public IDocumentFileStore Files { get; private init; } = null!;
     public DocumentSettings DocumentLimits { get; private init; } = null!;
     public ILogger Logger { get; private init; } = null!;
+    public IServiceProvider Services { get; private init; } = null!;
 
     public ActorContext Requester { get; private set; } = null!;
     public ActorContext Manager { get; private set; } = null!;
@@ -262,7 +264,8 @@ internal sealed class ProbeKit
             Documents = (IDocumentService)services.GetService(typeof(IDocumentService))!,
             Files = (IDocumentFileStore)services.GetService(typeof(IDocumentFileStore))!,
             DocumentLimits = (DocumentSettings)services.GetService(typeof(DocumentSettings))!,
-            Logger = logger
+            Logger = logger,
+            Services = services
         };
         await kit.BuildActorsAsync(ct);
         return kit;
