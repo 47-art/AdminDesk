@@ -415,8 +415,19 @@ internal sealed class EngineProbeModuleChecks
     {
         await _k.ExpectFieldAsync("44: a welfare category outside the list", "category",
             () => _k.CreateAsync(_k.Requester, "welfare", new { category = "Holiday", details = "x" }));
-        var welfare = await _k.CreateAsync(_k.Requester, "welfare", new { category = "Medical camp arrangements", details = "Annual health check-up camp" });
+        var welfareDefinition = await _k.Definitions.GetActiveAsync("welfare");
+        _k.Check(welfareDefinition is not null && welfareDefinition.Definition.Version == 2
+            && welfareDefinition.Definition.Fields!.Any(f => f.Key == "estimatedAmount" && !f.Required && f.Type == FieldType.Money),
+            "44: the welfare definition is not version 2 with an optional estimated amount");
+        await _k.ExpectFieldAsync("44: a negative estimated amount", "estimatedAmount",
+            () => _k.CreateAsync(_k.Requester, "welfare", new { category = "Employee events", details = "x", estimatedAmount = -5 }));
+        var welfare = await _k.CreateAsync(_k.Requester, "welfare", new { category = "Medical camp arrangements", details = "Annual health check-up camp", estimatedAmount = 12500.5m });
         await AssertStepsAsync(welfare, "welfare");
+        _k.Check(await StoredPayloadValueAsync(welfare, "estimatedAmount") is { } stored && stored == "1250050",
+            "44: the estimated amount was not stored as whole paise");
+        var noAmount = await _k.CreateAsync(_k.Requester, "welfare", new { category = "Employee events", details = "Team lunch" });
+        _k.Check(await StoredPayloadValueAsync(noAmount, "estimatedAmount") is null, "44: a welfare request without an estimate stored one");
+        await _k.ActAsync(_k.Requester, noAmount, RequestAction.Cancel, "Probe check finished");
         await _k.ExpectRefusedAsync("44: the manager doing the Admin review", _k.Manager, welfare, () => _k.ActAsync(_k.Manager, welfare, RequestAction.Approve));
         await DoAsync(_k.Admin, welfare, "admin-review", RequestAction.Approve);
         await _k.ExpectRefusedAsync("44: Admin giving the manager approval", _k.Admin, welfare, () => _k.ActAsync(_k.Admin, welfare, RequestAction.Approve));

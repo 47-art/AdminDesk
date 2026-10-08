@@ -222,6 +222,7 @@ public sealed class DemoRequestSeedTask : IStartupTask
         await RunAsync("welfare", priya, new()
         {
             ["category"] = JsonSerializer.SerializeToElement("Medical camp arrangements"),
+            ["estimatedAmount"] = JsonSerializer.SerializeToElement(15000),
             ["details"] = JsonSerializer.SerializeToElement("Annual health check camp for the office")
         }, ago(2, 8), Array.Empty<Move>(), ct);
 

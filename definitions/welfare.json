@@ -1,6 +1,6 @@
 {
   "code": "welfare",
-  "version": 1,
+  "version": 2,
   "name": "Employee welfare request",
   "description": "Ask for a welfare item such as assistance, festival requirements, an event, a medical camp, an engagement activity or a canteen request. Admin reviews, your manager approves, Admin acts and enters the expense, and you confirm.",
   "category": "Visitors and others",
@@ -19,6 +19,7 @@
         { "value": "Canteen-related requests", "label": "Canteen-related requests" }
       ]
     },
+    { "key": "estimatedAmount", "label": "Estimated amount", "type": "money", "min": 0, "section": "Request" },
     { "key": "details", "label": "Details", "type": "longText", "required": true, "maxLength": 1000, "fullWidth": true, "section": "Request" }
   ],
   "steps": [
