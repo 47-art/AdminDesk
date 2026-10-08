@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, roleGuard } from './core/auth/guards';
+import { authGuard, employeeProfileGuard, roleGuard } from './core/auth/guards';
 import { ROLE_GROUPS } from './core/constants/roles';
 import { ROUTE_PATHS } from './core/constants/routes';
 import { ShellComponent } from './layout/shell.component';
@@ -26,6 +26,7 @@ export const routes: Routes = [
       },
       {
         path: ROUTE_PATHS.MyRequests,
+        canActivate: [employeeProfileGuard],
         loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.MY_REQUESTS_ROUTES),
       },
       {
@@ -40,6 +41,7 @@ export const routes: Routes = [
       },
       {
         path: ROUTE_PATHS.NewRequest,
+        canActivate: [employeeProfileGuard],
         loadChildren: () => import('./features/new-request/new-request.routes').then((m) => m.NEW_REQUEST_ROUTES),
       },
       {

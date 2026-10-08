@@ -23,3 +23,11 @@ export const roleGuard =
     }
     return auth.hasAnyRole(roles) ? true : router.createUrlTree(['/', ROUTE_PATHS.Forbidden]);
   };
+
+/** For pages about the signed-in person's own requests: accounts without an employee profile go to the dashboard. */
+export const employeeProfileGuard: CanActivateFn = (route, state) => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+  if (!auth.isAuthenticated()) return authGuard(route, state);
+  return auth.hasEmployeeProfile() ? true : router.createUrlTree(['/', ROUTE_PATHS.Dashboard]);
+};

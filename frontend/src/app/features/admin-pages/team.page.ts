@@ -48,13 +48,13 @@ const PAGE_SIZES = [10, 20, 50];
     }
   `,
   template: `
-    <h1 class="text-heading">Team</h1>
+    <h1 class="text-heading">People</h1>
     <div class="bar">
       <input
         pInputText
         type="search"
         placeholder="Search by name"
-        aria-label="Search team"
+        aria-label="Search people"
         [ngModel]="search()"
         (ngModelChange)="onSearch($event)"
       />
@@ -93,7 +93,7 @@ const PAGE_SIZES = [10, 20, 50];
           [showCurrentPageReport]="true"
           currentPageReportTemplate="Showing {first} to {last} of {totalRecords}"
           [loading]="loading()"
-          aria-label="Team members"
+          aria-label="People"
           dataKey="employeeId"
         >
           <ng-template #header>

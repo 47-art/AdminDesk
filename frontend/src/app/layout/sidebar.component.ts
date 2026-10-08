@@ -179,7 +179,14 @@ export class SidebarComponent {
   readonly navigated = output<void>();
 
   protected readonly inboxCount = this.badges.inboxCount;
-  protected readonly items = computed(() => NAV_ITEMS.filter((i) => this.auth.hasAnyRole(i.roles)));
+  protected readonly items = computed(() =>
+    NAV_ITEMS.filter(
+      (i) =>
+        this.auth.hasAnyRole(i.roles) &&
+        !(i.hiddenForRoles && this.auth.hasAnyRole(i.hiddenForRoles)) &&
+        !(i.requiresEmployeeProfile && !this.auth.hasEmployeeProfile()),
+    ),
+  );
 
   protected toggleCollapsed(): void {
     this.collapsedToggle.emit();

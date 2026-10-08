@@ -20,6 +20,7 @@ export class AuthService {
   readonly expiresAtUtc = signal<string | null>(null);
 
   readonly isAuthenticated = computed(() => this.token() !== null && this.user() !== null);
+  readonly hasEmployeeProfile = computed(() => this.user()?.employeeId != null);
   readonly canSeeAudit = computed(() => this.hasAnyRole(ROLE_GROUPS.AuditViewers));
 
   /** Run once at application start. Discards a stored session that is expired or unreadable. */

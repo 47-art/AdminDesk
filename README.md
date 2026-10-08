@@ -129,7 +129,7 @@ The process description leaves some things open. What was chosen:
 12. The Audit trail section on the request page is visible to Admin, System admin and Management only.
 13. Approval limits are held in the database (the shipped modules declare none) and can be edited there until the limits editor exists.
 14. The Management role exists, but no shipped module routes to Management yet: approval by Management arrives with the modules whose approval rules need it, so a Management login sees an empty Waiting for me list. Management is read-only across the organisation (every request, the All requests page, organisation counters and the audit trail) and approves only at steps assigned to it, as limits are configured. The System admin is a technical role: it configures definitions, limits and background jobs as those screens arrive, and has a read-only view of requests; it takes no business actions. Only the Admin has the operational override (reject at any step).
-15. The Team directory (the Team page in the menu) is open to managers, Admin, HR, Management and System admin. Managers see their direct reports; the others see everyone. Each row shows the code, name, designation, department and location; email addresses are not shown.
+15. The people directory (the People page in the menu) is open to managers, Admin, HR, Management and System admin. Managers see their direct reports; the others see everyone. Each row shows the code, name, designation, department and location; email addresses are not shown.
 
 ## Not yet built
 
