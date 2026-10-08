@@ -6,6 +6,8 @@ export const AUDIT_EVENT_LABELS: Record<string, string> = {
   Rejected: 'Rejected',
   Cancelled: 'Cancelled',
   Closed: 'Closed',
+  StepActivated: 'Step started',
+  StepSkipped: 'Step skipped',
   DefinitionSynced: 'Definition synced',
 };
 

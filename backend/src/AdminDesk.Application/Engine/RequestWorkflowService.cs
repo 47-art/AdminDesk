@@ -154,6 +154,17 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
 
             await AppendAuditAsync(tx, id, AuditEventTypes.Created, actor.UserId, actor.Name, RequesterLabel,
                 null, null, RequestStatus.InProgress.ToString(), null, null, now, ct);
+            foreach (var step in advanced.Steps)
+            {
+                if (step.State == StepState.NotRequired)
+                {
+                    await AppendEngineStepEventAsync(tx, id, AuditEventTypes.StepSkipped, step.Key, now, ct);
+                }
+                else if (advanced.Active?.Seq == step.Seq)
+                {
+                    await AppendEngineStepEventAsync(tx, id, AuditEventTypes.StepActivated, step.Key, now, ct);
+                }
+            }
 
             var context = new HookContext(connection, tx, actor, snapshot);
             foreach (var hook in _hooks)
@@ -379,6 +390,14 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
             {
                 var changed = row with { State = step.State, ActivatedUtc = activating ? now : row.ActivatedUtc };
                 await _requests.UpdateStepAsync(tx, changed, ct);
+                if (row.State != step.State && step.State == StepState.NotRequired)
+                {
+                    await AppendEngineStepEventAsync(tx, request.Id, AuditEventTypes.StepSkipped, step.Key, now, ct);
+                }
+                else if (activating)
+                {
+                    await AppendEngineStepEventAsync(tx, request.Id, AuditEventTypes.StepActivated, step.Key, now, ct);
+                }
             }
         }
         if (advanced.Actors.Count > 0)
@@ -499,6 +518,13 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
             new AuditEvent(requestId, eventType, userId, name, role, stepKey, fromStatus, toStatus, comment, detailsJson,
                 _correlation.CorrelationId, now),
             ct);
+
+    // Step changes the engine decides on its own (a step skipped by a rule, the next step becoming
+    // active) are recorded against the system actor so the trail explains every state change.
+    private Task AppendEngineStepEventAsync(
+        DbTransaction tx, long requestId, string eventType, string stepKey, DateTime now, CancellationToken ct) =>
+        AppendAuditAsync(tx, requestId, eventType, SystemActor.UserId, SystemActor.Name, null,
+            stepKey, null, null, null, null, now, ct);
 
     private static PlannedStep ToPlanned(RequestStepRow row) =>
         new(row.Seq, row.StepKey, row.Name, row.StepType, row.State, Array.Empty<ActorSlot>());

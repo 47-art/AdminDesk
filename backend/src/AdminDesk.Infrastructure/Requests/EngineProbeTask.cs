@@ -661,8 +661,9 @@ internal sealed class CoreChecks
 
         // 13 audit
         var types = await _k.QueryAsync<string>("SELECT DISTINCT event_type FROM audit_events");
-        var allowed = new[] { "Created", "StepApproved", "StepCompleted", "Rejected", "Cancelled", "Closed" };
-        _k.Check(types.All(allowed.Contains) && allowed.All(types.Contains), $"13: audit event types are {string.Join(",", types)}");
+        var required = new[] { "Created", "StepApproved", "StepCompleted", "Rejected", "Cancelled", "Closed", "StepActivated" };
+        var allowed = required.Append("StepSkipped").ToArray();
+        _k.Check(types.All(allowed.Contains) && required.All(types.Contains), $"13: audit event types are {string.Join(",", types)}");
         var ex = await _k.ExpectAsync<SqliteException>("13: updating the audit trail",
             () => _k.ExecuteRawAsync("UPDATE audit_events SET comment = 'x'"));
         _k.Check(ex.SqliteErrorCode == 19, $"13: audit update failed with code {ex.SqliteErrorCode}, expected 19");

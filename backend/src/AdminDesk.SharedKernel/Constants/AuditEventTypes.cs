@@ -9,5 +9,7 @@ public static class AuditEventTypes
     public const string Rejected = "Rejected";
     public const string Cancelled = "Cancelled";
     public const string Closed = "Closed";
+    public const string StepActivated = "StepActivated";
+    public const string StepSkipped = "StepSkipped";
     public const string DefinitionSynced = "DefinitionSynced";
 }
