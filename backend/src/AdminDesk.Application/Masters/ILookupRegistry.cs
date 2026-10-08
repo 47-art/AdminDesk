@@ -10,6 +10,21 @@ public interface ILookupProvider
     Task<LookupItem?> GetAsync(long id, CancellationToken ct);
 
     Task<bool> ExistsAsync(long id, CancellationToken ct);
+
+    // The items for the given ids in one go; ids that do not exist or are inactive are left out.
+    // The default asks one at a time; providers backed by a table override it with one query.
+    async Task<IReadOnlyList<LookupItem>> GetManyAsync(IReadOnlyCollection<long> ids, CancellationToken ct)
+    {
+        var found = new List<LookupItem>();
+        foreach (var id in ids.Distinct())
+        {
+            if (await GetAsync(id, ct) is { } item)
+            {
+                found.Add(item);
+            }
+        }
+        return found;
+    }
 }
 
 public interface ILookupRegistry

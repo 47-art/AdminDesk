@@ -49,6 +49,19 @@ public abstract class SimpleMasterLookupProvider : ILookupProvider
             new { Id = id }, cancellationToken: ct));
     }
 
+    public async Task<IReadOnlyList<LookupItem>> GetManyAsync(IReadOnlyCollection<long> ids, CancellationToken ct)
+    {
+        if (ids.Count == 0)
+        {
+            return Array.Empty<LookupItem>();
+        }
+        await using var connection = await _factory.OpenAsync(ct);
+        var rows = await connection.QueryAsync<LookupItem>(new CommandDefinition(
+            Select + "WHERE t.id IN @Ids AND " + AuditSql.Active("t"),
+            new { Ids = ids.Distinct().ToArray() }, cancellationToken: ct));
+        return rows.ToList();
+    }
+
     public async Task<bool> ExistsAsync(long id, CancellationToken ct)
     {
         await using var connection = await _factory.OpenAsync(ct);

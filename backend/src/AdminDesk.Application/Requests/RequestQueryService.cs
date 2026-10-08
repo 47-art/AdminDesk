@@ -370,21 +370,30 @@ public sealed class RequestQueryService : IRequestQueryService
             return;
         }
         using var document = JsonDocument.Parse(json);
+        var wanted = new List<(string Key, string Kind, long Id)>();
         foreach (var field in lookupFields)
         {
-            if (!document.RootElement.TryGetProperty(field.Key, out var value) || value.ValueKind != JsonValueKind.Number)
+            if (document.RootElement.TryGetProperty(field.Key, out var value) && value.ValueKind == JsonValueKind.Number)
             {
-                continue;
+                wanted.Add((field.Key, field.LookupKind!, value.GetInt64()));
             }
-            var provider = _lookups.Find(field.LookupKind!);
+        }
+
+        // One query per lookup kind rather than one per field.
+        foreach (var group in wanted.GroupBy(w => w.Kind))
+        {
+            var provider = _lookups.Find(group.Key);
             if (provider is null)
             {
                 continue;
             }
-            var item = await provider.GetAsync(value.GetInt64(), ct);
-            if (item is not null)
+            var items = (await provider.GetManyAsync(group.Select(w => w.Id).ToList(), ct)).ToDictionary(i => i.Id);
+            foreach (var (key, _, id) in group)
             {
-                labels[prefix + field.Key] = item.Label;
+                if (items.TryGetValue(id, out var item))
+                {
+                    labels[prefix + key] = item.Label;
+                }
             }
         }
     }
