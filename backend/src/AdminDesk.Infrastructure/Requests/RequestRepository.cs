@@ -80,10 +80,16 @@ public sealed class RequestRepository : IRequestRepository
         return await tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(sql, p, tx, cancellationToken: ct));
     }
 
-    public async Task<RequestSnapshot?> GetSnapshotAsync(DbTransaction tx, long id, CancellationToken ct)
+    public Task<RequestSnapshot?> GetSnapshotAsync(DbTransaction tx, long id, CancellationToken ct) =>
+        QuerySnapshotAsync(tx.Connection!, tx, id, ct);
+
+    public Task<RequestSnapshot?> GetSnapshotAsync(DbConnection connection, long id, CancellationToken ct) =>
+        QuerySnapshotAsync(connection, null, id, ct);
+
+    private static async Task<RequestSnapshot?> QuerySnapshotAsync(DbConnection connection, DbTransaction? tx, long id, CancellationToken ct)
     {
         var sql = "SELECT " + RequestColumns + " FROM requests r WHERE r.id = @Id AND " + AuditSql.Active("r");
-        return await tx.Connection!.QuerySingleOrDefaultAsync<RequestSnapshot>(
+        return await connection.QuerySingleOrDefaultAsync<RequestSnapshot>(
             new CommandDefinition(sql, new { Id = id }, tx, cancellationToken: ct));
     }
 

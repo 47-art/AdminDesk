@@ -41,6 +41,9 @@ public static class Roles
     public static readonly string[] AssetMasterViewers = { IT, Admin, Management, SystemAdmin };
     public static readonly string[] IdCardMasterViewers = { HR, Admin, Management, SystemAdmin, IT };
 
+    // Documents: these roles can open and download documents of requests they see but not upload or remove.
+    public static readonly string[] DocumentReadOnly = { Management, SystemAdmin };
+
     // Manager is derived from the reporting line, so it is never assigned directly.
     public static readonly string[] Assignable =
     {

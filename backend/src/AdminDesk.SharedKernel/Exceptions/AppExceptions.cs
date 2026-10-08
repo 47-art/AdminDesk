@@ -20,14 +20,16 @@ public class ValidationException : AppException
 {
     public IReadOnlyList<FieldError> FieldErrors { get; }
 
-    public ValidationException(IEnumerable<FieldError> fieldErrors, string message = "One or more fields are invalid.")
-        : base(ErrorCodes.VALIDATION_FAILED, message, 400)
+    public ValidationException(
+        IEnumerable<FieldError> fieldErrors, string message = "One or more fields are invalid.",
+        string code = ErrorCodes.VALIDATION_FAILED)
+        : base(code, message, 400)
     {
         FieldErrors = fieldErrors.ToList();
     }
 
-    public ValidationException(string field, string message)
-        : this(new[] { new FieldError { Field = field, Message = message } }, message)
+    public ValidationException(string field, string message, string code = ErrorCodes.VALIDATION_FAILED)
+        : this(new[] { new FieldError { Field = field, Message = message } }, message, code)
     {
     }
 }

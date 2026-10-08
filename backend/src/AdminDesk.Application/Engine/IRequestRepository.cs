@@ -76,6 +76,9 @@ public interface IRequestRepository
     // Null when the request does not exist or is inactive.
     Task<RequestSnapshot?> GetSnapshotAsync(DbTransaction tx, long id, CancellationToken ct);
 
+    // The same read on a plain connection, for callers that do not write.
+    Task<RequestSnapshot?> GetSnapshotAsync(DbConnection connection, long id, CancellationToken ct);
+
     // Compare-and-increment on the row version. Returns the rows affected; zero means the
     // request changed since it was read.
     Task<int> UpdateRequestAsync(DbTransaction tx, RequestSnapshot request, long expectedRowVersion, CancellationToken ct);
