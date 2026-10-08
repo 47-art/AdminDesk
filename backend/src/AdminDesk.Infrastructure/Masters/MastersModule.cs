@@ -1,4 +1,5 @@
 using AdminDesk.Application.Abstractions;
+using AdminDesk.Application.Engine;
 using AdminDesk.Application.Masters;
 using AdminDesk.Infrastructure.Seeding;
 using Microsoft.Extensions.Configuration;
@@ -29,6 +30,7 @@ public sealed class MastersModule : IServiceModule
 
         services.AddScoped<IMasterAssetRepository, MasterAssetRepository>();
         services.AddScoped<IMasterAssetService, MasterAssetService>();
+        services.AddScoped<IRequestHook, AssetMasterHook>();
 
         services.AddScoped<IStartupTask, OrganisationSeedTask>();
         services.AddScoped<IStartupTask, AssetMasterSeedTask>();
