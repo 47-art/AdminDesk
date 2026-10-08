@@ -111,6 +111,7 @@ export interface StepSummary {
   actorLabel: string | null;
   actionLabel: string | null;
   captureFields: FieldDto[];
+  requiresDocument: boolean;
 }
 
 export interface ModuleDefinitionDto {
@@ -181,6 +182,18 @@ export interface RequestStepDto {
   isCurrent: boolean;
   captured: Record<string, unknown> | null;
   captureFields: FieldDto[];
+  requiresDocument: boolean;
+}
+
+export interface DocumentDto {
+  id: number;
+  originalName: string;
+  sizeBytes: number;
+  contentType: string;
+  stepKey: string | null;
+  uploadedByName: string;
+  uploadedUtc: string;
+  canRemove: boolean;
 }
 
 export interface RequestDetail {
