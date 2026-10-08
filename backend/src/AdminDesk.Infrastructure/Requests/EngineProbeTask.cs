@@ -440,6 +440,23 @@ internal sealed class ProbeKit
         Check(ex.Code == ErrorCodes.ACTION_NOT_ALLOWED, $"{what}: expected code ACTION_NOT_ALLOWED but got {ex.Code}");
     }
 
+    // Refused as not allowed when the actor can see the request, as not found when they cannot.
+    public async Task ExpectRefusedAsync(string what, ActorContext actor, long id, Func<Task> call)
+    {
+        if (await Access.CanViewAsync(actor, id, default))
+        {
+            await ExpectNotAllowedAsync(what, call);
+        }
+        else
+        {
+            await ExpectHiddenAsync(what, call);
+        }
+    }
+
+    // A request the actor may not see answers exactly as a missing one does, whatever the action.
+    public async Task ExpectHiddenAsync(string what, Func<Task> call) =>
+        await ExpectAsync<NotFoundException>(what, call);
+
     // The cancel is refused with CANCEL_LOCKED and nothing about the request changes.
     public async Task ExpectCancelLockedAsync(string what, ActorContext actor, long id, string reason)
     {
@@ -592,7 +609,8 @@ internal sealed class CoreChecks
             () => _k.ActAsync(_k.Store, c, RequestAction.Complete, null, new Dictionary<string, JsonElement> { ["extra"] = ProbeKit.Json("x") }));
 
         // 7 cancel is locked once the material is issued (request c has passed the issue step)
-        await _k.ExpectNotAllowedAsync("7: cancel by a non-requester", () => _k.ActAsync(_k.Finance, c, RequestAction.Cancel, "not mine"));
+        await _k.ExpectHiddenAsync("7: cancel by someone who cannot see the request", () => _k.ActAsync(_k.Finance, c, RequestAction.Cancel, "not mine"));
+        await _k.ExpectHiddenAsync("7: reject without a reason by someone who cannot see the request", () => _k.ActAsync(_k.Finance, c, RequestAction.Reject));
         await _k.ExpectCancelLockedAsync("7: cancel after the material was issued", _k.Requester, c, "no longer needed");
         _k.Check((await _k.RequestAsync(c)).CurrentStatus == "InProgress", "7: the locked request is not in progress");
         await _k.ActAsync(_k.Store, c, RequestAction.Complete);
@@ -870,9 +888,9 @@ internal sealed class CoreChecks
         {
             if (actor != _k.Admin)
             {
-                await _k.ExpectNotAllowedAsync($"13: {name} reject at a task step", () => _k.ActAsync(actor, target, RequestAction.Reject, "no"));
+                await _k.ExpectRefusedAsync($"13: {name} reject at a task step", actor, target, () => _k.ActAsync(actor, target, RequestAction.Reject, "no"));
             }
-            await _k.ExpectNotAllowedAsync($"13: {name} cancel of another person's request", () => _k.ActAsync(actor, target, RequestAction.Cancel, "no"));
+            await _k.ExpectRefusedAsync($"13: {name} cancel of another person's request", actor, target, () => _k.ActAsync(actor, target, RequestAction.Cancel, "no"));
         }
         _k.Check(await _k.FingerprintAsync(target) == untouched, "13: a refused call changed the request");
 
