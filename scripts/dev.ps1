@@ -16,6 +16,21 @@ $logsDir = Join-Path $repoRoot 'logs'
 $apiPidFile = Join-Path $logsDir 'dev-api.pid'
 $webPidFile = Join-Path $logsDir 'dev-web.pid'
 
+# Ends a process and everything it started. A process that is already gone is not an error.
+function Stop-ProcessTree {
+    param([string]$ProcessId)
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & cmd.exe /c "taskkill /PID $ProcessId /T /F >nul 2>&1"
+    }
+    catch {
+    }
+    finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 function Stop-Tree {
     param([string]$PidFile)
     if (-not (Test-Path $PidFile)) {
@@ -23,7 +38,7 @@ function Stop-Tree {
     }
     $text = (Get-Content $PidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
     if ($text -match '^\d+$') {
-        & taskkill /PID $text /T /F 2>&1 | Out-Null
+        Stop-ProcessTree $text
     }
     Remove-Item $PidFile -Force -ErrorAction SilentlyContinue
 }
@@ -124,10 +139,10 @@ try {
     }
     finally {
         if ($webProc) {
-            & taskkill /PID $webProc.Id /T /F 2>&1 | Out-Null
+            Stop-ProcessTree $webProc.Id
         }
         if ($apiProc) {
-            & taskkill /PID $apiProc.Id /T /F 2>&1 | Out-Null
+            Stop-ProcessTree $apiProc.Id
         }
         Remove-Item $apiPidFile -Force -ErrorAction SilentlyContinue
         Remove-Item $webPidFile -Force -ErrorAction SilentlyContinue
