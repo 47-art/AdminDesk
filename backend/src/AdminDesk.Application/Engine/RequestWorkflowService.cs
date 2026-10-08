@@ -88,7 +88,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
             throw new ForbiddenException("Your account is not linked to an employee profile.", ErrorCodes.NO_EMPLOYEE_PROFILE);
         }
         var managerId = await _employees.GetReportingManagerIdAsync(requesterId, ct);
-        var requester = new RequesterInfo(requesterId, managerId is { } m ? (int)m : null, actor.Roles);
+        var requester = new RequesterInfo(requesterId, managerId is { } m ? (int)m : null);
 
         var today = IndiaTime.Today(_clock);
         var normalised = await _validator.ValidateAsync(definition, command.Common, today, command.Payload, ct);
@@ -365,7 +365,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         }
 
         var managerId = await _employees.GetReportingManagerIdAsync(request.RequesterEmployeeId, ct);
-        var requester = new RequesterInfo(request.RequesterEmployeeId, managerId is { } m ? (int)m : null, new HashSet<string>());
+        var requester = new RequesterInfo(request.RequesterEmployeeId, managerId is { } m ? (int)m : null);
         var limits = await LoadLimitsAsync(definition.Code, ct);
         var values = BuildValues(definition, request.PayloadJson, rows);
         var advanced = Advance(definition, rows.Select(ToPlanned).ToList(), values, limits, requester);

@@ -61,7 +61,7 @@ public sealed class LimitSet
 
 public sealed record LimitEntry(string StepKey, string LimitKey, long ValueMinor, string? Unit);
 
-public sealed record RequesterInfo(int EmployeeId, int? ManagerEmployeeId, IReadOnlySet<string> Roles);
+public sealed record RequesterInfo(int EmployeeId, int? ManagerEmployeeId);
 
 // Outcome of walking the steps forward: the updated list and the seq now waiting for action.
 public sealed record ForwardResult(IReadOnlyList<PlannedStep> Steps, int? ActiveSeq);
