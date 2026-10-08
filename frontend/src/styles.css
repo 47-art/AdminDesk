@@ -26,7 +26,6 @@ body {
 body {
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
-  line-height: 1.5;
   font-weight: 400;
   background: #F4F8FC;
   color: #1F2A37;
@@ -94,4 +93,22 @@ body {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* One control height for every text-like field, number and money inputs included */
+.p-inputtext,
+.p-inputnumber,
+.p-select,
+.p-datepicker-input {
+  box-sizing: border-box;
+  min-height: 40px;
+}
+
+.p-inputnumber {
+  align-items: stretch;
+}
+
+.p-inputnumber .p-inputnumber-input {
+  box-sizing: border-box;
+  min-height: 40px;
 }
