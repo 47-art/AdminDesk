@@ -151,35 +151,33 @@ public sealed class RequestRepository : IRequestRepository
         await tx.Connection!.ExecuteAsync(new CommandDefinition(sql, new { RequestId = requestId }, tx, cancellationToken: ct));
     }
 
-    public async Task<IReadOnlyList<RequestStepRow>> GetStepsAsync(DbConnection connection, long requestId, CancellationToken ct)
+    public Task<IReadOnlyList<RequestStepRow>> GetStepsAsync(DbConnection connection, long requestId, CancellationToken ct) =>
+        QueryStepsAsync(connection, null, requestId, ct);
+
+    public Task<IReadOnlyList<ActorRow>> GetActiveActorsAsync(DbConnection connection, long requestId, CancellationToken ct) =>
+        QueryActiveActorsAsync(connection, null, requestId, ct);
+
+    public Task<IReadOnlyList<RequestStepRow>> GetStepsAsync(DbTransaction tx, long requestId, CancellationToken ct) =>
+        QueryStepsAsync(tx.Connection!, tx, requestId, ct);
+
+    public Task<IReadOnlyList<ActorRow>> GetActiveActorsAsync(DbTransaction tx, long requestId, CancellationToken ct) =>
+        QueryActiveActorsAsync(tx.Connection!, tx, requestId, ct);
+
+    private static async Task<IReadOnlyList<RequestStepRow>> QueryStepsAsync(
+        DbConnection connection, DbTransaction? tx, long requestId, CancellationToken ct)
     {
         var sql = "SELECT " + StepColumns + " FROM request_steps s WHERE s.request_id = @RequestId ORDER BY s.seq";
         return (await connection.QueryAsync<RequestStepRow>(
-            new CommandDefinition(sql, new { RequestId = requestId }, cancellationToken: ct))).ToList();
+            new CommandDefinition(sql, new { RequestId = requestId }, tx, cancellationToken: ct))).ToList();
     }
 
-    public async Task<IReadOnlyList<ActorRow>> GetActiveActorsAsync(DbConnection connection, long requestId, CancellationToken ct)
+    private static async Task<IReadOnlyList<ActorRow>> QueryActiveActorsAsync(
+        DbConnection connection, DbTransaction? tx, long requestId, CancellationToken ct)
     {
         const string sql =
             "SELECT a.id, a.request_id, a.step_seq, a.role_name, a.employee_id FROM request_step_actors a " +
             "WHERE a.request_id = @RequestId AND a.is_active = 1 ORDER BY a.step_seq, a.id";
         return (await connection.QueryAsync<ActorRow>(
-            new CommandDefinition(sql, new { RequestId = requestId }, cancellationToken: ct))).ToList();
-    }
-
-    public async Task<IReadOnlyList<RequestStepRow>> GetStepsAsync(DbTransaction tx, long requestId, CancellationToken ct)
-    {
-        var sql = "SELECT " + StepColumns + " FROM request_steps s WHERE s.request_id = @RequestId ORDER BY s.seq";
-        return (await tx.Connection!.QueryAsync<RequestStepRow>(
-            new CommandDefinition(sql, new { RequestId = requestId }, tx, cancellationToken: ct))).ToList();
-    }
-
-    public async Task<IReadOnlyList<ActorRow>> GetActiveActorsAsync(DbTransaction tx, long requestId, CancellationToken ct)
-    {
-        const string sql =
-            "SELECT a.id, a.request_id, a.step_seq, a.role_name, a.employee_id FROM request_step_actors a " +
-            "WHERE a.request_id = @RequestId AND a.is_active = 1 ORDER BY a.step_seq, a.id";
-        return (await tx.Connection!.QueryAsync<ActorRow>(
             new CommandDefinition(sql, new { RequestId = requestId }, tx, cancellationToken: ct))).ToList();
     }
 
