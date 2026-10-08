@@ -179,7 +179,9 @@ internal sealed class EngineProbeMasterChecks
         _k.Check(filtered.Count >= 1 && filtered.All(i => i.Label.Contains("Latitude")), "36: searching the asset lookup by model failed");
 
         var many = await _k.Lookups.Find(MasterLookupKinds.HeldSim)!.GetManyAsync(heldSimIds.Concat(availableSimIds).ToArray(), ct);
-        _k.Check(many.Count == heldSimIds.Count, "36: GetManyAsync of heldSim returned items that are not held");
+        // Label lookups return every item asked for, so a request keeps showing the label of an item that was
+        // allocated or returned since. Eligibility applies to search and validation only.
+        _k.Check(many.Count == heldSimIds.Count + availableSimIds.Count, "36: GetManyAsync of heldSim did not return every requested item");
 
         // An item taken in the meantime no longer validates.
         var sim = availableSimIds[0];
