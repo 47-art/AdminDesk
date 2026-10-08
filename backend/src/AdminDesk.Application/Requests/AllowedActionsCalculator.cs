@@ -16,7 +16,8 @@ public static class AllowedActionsCalculator
         int? currentStepSeq,
         StepType? currentStepType,
         IReadOnlyList<ActorRow> activeActors,
-        bool cancelLocked = false)
+        bool cancelLocked = false,
+        bool currentStepPending = true)
     {
         if (!RequestWorkflowService.ActionableStatuses.Contains(status))
         {
@@ -46,8 +47,8 @@ public static class AllowedActionsCalculator
         }
 
         // The Admin may reject any in-progress request at its current step. A request with no pending
-        // step cannot be rejected. Cancel stays with the requester alone.
-        if (viewer.Roles.Overlaps(Roles.RequestOverride) && currentStepSeq is not null && !allowed.Contains(RequestAction.Reject))
+        // step cannot be rejected, which is also what the engine requires. Cancel stays with the requester alone.
+        if (viewer.Roles.Overlaps(Roles.RequestOverride) && currentStepSeq is not null && currentStepPending && !allowed.Contains(RequestAction.Reject))
         {
             allowed.Add(RequestAction.Reject);
         }

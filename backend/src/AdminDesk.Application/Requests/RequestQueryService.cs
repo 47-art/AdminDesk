@@ -114,7 +114,8 @@ public sealed class RequestQueryService : IRequestQueryService
 
         var allowed = AllowedActionsCalculator.Compute(
             actor, status, header.RequesterEmployeeId, currentSeq, currentType, rows.ActiveActors,
-            TransitionRules.CancelLocked(definition.Steps, rows.Steps.Select(r => (r.StepKey, r.State))));
+            TransitionRules.CancelLocked(definition.Steps, rows.Steps.Select(r => (r.StepKey, r.State))),
+            rows.Steps.Any(r => r.Seq == currentSeq && r.State == StepState.Pending));
         var primary = AllowedActionsCalculator.PrimaryLabel(status, currentType, currentDefinition?.ActionLabel);
 
         string? cancelReason = null;
