@@ -165,6 +165,7 @@ const TOP_BAR_OFFSET_PX = 72 + 16;
           [group]="group()!"
           [common]="commonGroup()"
           [requester]="requester()"
+          [requiredCommon]="def.requiredCommonFields ?? []"
         />
       </form>
 
