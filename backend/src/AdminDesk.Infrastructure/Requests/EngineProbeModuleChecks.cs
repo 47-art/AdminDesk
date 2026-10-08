@@ -1,6 +1,7 @@
 using System.Text.Json;
 using AdminDesk.Application.Engine;
 using AdminDesk.Application.Masters;
+using AdminDesk.Application.Requests;
 using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Enums;
 using AdminDesk.SharedKernel.Exceptions;
@@ -197,6 +198,20 @@ internal sealed class EngineProbeModuleChecks
         _k.Check(!await _k.Lookups.ExistsAsync(MasterLookupKinds.AvailableSim, sim, ct), "39: the allocated SIM is still offered as available");
         _k.Check(await _k.Lookups.ExistsAsync(MasterLookupKinds.HeldSim, sim, ct), "39: the allocated SIM is not offered as held");
         _k.Check(await _k.AuditCountAsync(withCost, "MasterUpdated") == 1, "39: the SIM master update is not in the audit trail");
+
+        // The page reads the request back after the step: the label of the SIM that is no longer available
+        // must still resolve, and reading must not fail.
+        try
+        {
+            using var scope = _k.Services.CreateScope();
+            var detail = await scope.ServiceProvider.GetRequiredService<IRequestQueryService>().GetDetailAsync(_k.Admin, withCost, ct);
+            _k.Check(detail.LookupLabels.Values.Any(v => v.Contains(" - ")),
+                "39: the allocated SIM label is missing on the closed request");
+        }
+        catch (Exception exception)
+        {
+            _k.Check(false, "39: reading the closed SIM request failed: " + exception.Message);
+        }
         _simAllocated = sim;
         _k.Pass("39 SIM request: optional Finance step, allocation, activation and master update");
     }
