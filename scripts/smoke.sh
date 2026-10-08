@@ -232,6 +232,7 @@ main_mode() {
   call GET /api/modules/courier "$T_EMP"
   DEF_CUR=$(jget d.data.definitionId)
   assert_match "courier module returns its definition id" "$DEF_CUR" '^[0-9]+$'
+  assert_eq "courier description is a long text with help text"     "$(jget 'd.data.version + "/" + d.data.sections.flatMap(s => s.fields).filter(f => f.key === "documentDescription").map(f => f.type + "/" + f.maxLength + "/" + (f.helpText ? "help" : "none")).join()')" "3/LongText/500/help"
 
   if [ -n "${DB_PATH-}" ]; then
     EMP_USER=$(dbval "SELECT Id FROM AspNetUsers WHERE NormalizedEmail = 'EMPLOYEE@DEMO.TEST'")

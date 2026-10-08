@@ -33,6 +33,7 @@ export interface RequesterInfo {
 interface AriaTarget {
   domId: string;
   control: AbstractControl;
+  hasHelp: boolean;
 }
 
 const PRIORITY_OPTIONS = Object.values(PRIORITIES).map((p) => ({ label: p, value: p }));
@@ -263,7 +264,7 @@ const FILTER_ABOVE_OPTIONS = 8;
         }
 
         @if (field.helpText) {
-          <div class="help">{{ field.helpText }}</div>
+          <div class="help" [id]="domId(field) + '-help'">{{ field.helpText }}</div>
         }
         <app-field-error [id]="domId(field) + '-error'" [message]="messageFor(field)" />
       </div>
@@ -394,12 +395,12 @@ export class DynamicFormComponent {
     const fields = this.captureFields() ?? this.sections().flatMap((s) => s.fields);
     for (const field of fields) {
       const control = group.controls[field.key];
-      if (control) targets.push({ domId: fieldDomId(field.key), control });
+      if (control) targets.push({ domId: fieldDomId(field.key), control, hasHelp: !!field.helpText });
     }
     const common = this.common();
     if (common && !this.isCapture()) {
       for (const [name, control] of Object.entries(common.controls)) {
-        targets.push({ domId: commonDomId(name), control: control as AbstractControl });
+        targets.push({ domId: commonDomId(name), control: control as AbstractControl, hasHelp: false });
       }
     }
     return targets;
@@ -416,12 +417,13 @@ export class DynamicFormComponent {
     // The inner text boxes of the library controls carry the state for assistive technology.
     afterRenderEffect(() => {
       this.tick();
-      for (const { domId, control } of this.ariaTargets()) {
+      for (const { domId, control, hasHelp } of this.ariaTargets()) {
         const el = document.getElementById(domId);
         if (!el) continue;
         const message = errorMessage(control);
         el.setAttribute('aria-invalid', message ? 'true' : 'false');
-        if (message) el.setAttribute('aria-describedby', `${domId}-error`);
+        const described = [hasHelp ? `${domId}-help` : '', message ? `${domId}-error` : ''].filter(Boolean).join(' ');
+        if (described) el.setAttribute('aria-describedby', described);
         else el.removeAttribute('aria-describedby');
       }
     });
