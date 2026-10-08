@@ -1,6 +1,6 @@
 {
   "code": "courier",
-  "version": 4,
+  "version": 5,
   "name": "Courier request",
   "description": "Send a document or parcel by courier. Admin selects the courier, dispatches it and records the tracking number; the requester confirms delivery; Admin then uploads the proof of delivery.",
   "category": "Visitors and others",
@@ -9,7 +9,7 @@
   "subject": "Courier to {receiverName}",
   "fields": [
     { "key": "documentDescription", "label": "What are you sending?", "type": "longText", "helpText": "Describe the document or material, for example: signed contract, 3 pages.", "required": true, "maxLength": 500, "fullWidth": true, "section": "Document or material details" },
-    { "key": "senderName", "label": "Sender name", "type": "text", "required": true, "section": "Sender" },
+    { "key": "senderName", "label": "Sender name", "type": "text", "required": true, "defaultFrom": "requesterName", "section": "Sender" },
     { "key": "receiverName", "label": "Receiver name", "type": "text", "required": true, "section": "Receiver" },
     { "key": "receiverAddress", "label": "Receiver address", "type": "longText", "required": true, "fullWidth": true, "section": "Address" },
     { "key": "receiverCity", "label": "City", "type": "text", "required": true, "section": "Address" }

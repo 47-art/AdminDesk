@@ -24,7 +24,8 @@ public sealed record FieldDto(
     bool FullWidth,
     IReadOnlyList<FieldOptionDto> Options,
     string? LookupKind,
-    ShowWhenDto? ShowWhen);
+    ShowWhenDto? ShowWhen,
+    string? DefaultFrom = null);
 
 public sealed record ShowWhenDto(string Field, [property: JsonPropertyName("equals")] string Value);
 

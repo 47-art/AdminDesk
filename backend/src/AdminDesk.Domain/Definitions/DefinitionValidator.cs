@@ -217,6 +217,10 @@ public static class DefinitionValidator
                 problems.Add($"Definition '{file}': {subject} uses unregistered lookup kind '{field.LookupKind}' (registered: {Join(lookupKinds)})");
             }
         }
+        if (field.DefaultFrom is not null && field.Type is not (FieldType.Text or FieldType.LongText))
+        {
+            problems.Add($"Definition '{file}': {subject} has a defaultFrom but is not a text field");
+        }
         if (field.MaxLength is <= 0)
         {
             problems.Add($"Definition '{file}': {subject} maxLength must be above 0");

@@ -45,6 +45,10 @@ Lookup kinds are registered in code. Nine exist: `employee`, `department`, `proj
 - `availableSim` and `availableAsset` list items that are free to allocate,
 - `heldSim` and `heldAsset` list the items currently held by the person raising the request.
 
+### Starting value from the signed-in user
+
+A `text` or `longText` field may carry `"defaultFrom": "requesterName"`. The form then starts with the name of the person raising the request in that box. It is only a starting value: the user can change it and whatever is typed is what gets submitted. `requesterName` is the only value; any other value, or `defaultFrom` on a field of another type, is refused when definitions load. The courier definition uses it for the sender name.
+
 ### Showing a field only for some answers
 
 A field (or a captured field) may carry `showWhen`, naming an earlier field in the same list and the value it must have:
@@ -71,7 +75,7 @@ A task step may carry `actionLabel`, the text of its one-click button, and `capt
 
 A task step may also carry `"requiresDocument": true`. That step cannot be completed until at least one document has been uploaded to the request for that step; completing it earlier is refused with the error code `DOCUMENT_REQUIRED`. The courier definition uses it on the last step, `pod-upload` (Proof of delivery upload), which the Admin completes after the requester has confirmed delivery. The flag is only allowed on task steps.
 
-Any step may carry `"locksCancel": true`. Once that step is done the request can no longer be cancelled: Cancel disappears from the available actions and a Cancel attempt is refused with the error code `CANCEL_LOCKED`. Before that point the requester can cancel as usual, including while the locking step itself is the current one. Stationery sets it on `issue` and courier on `dispatch`; stationery is at version 2 and courier at version 4 (version 3 made the description field a longer "What are you sending?" box with help text; version 4 added the proof of delivery upload step). Definition sync only adds new versions, so a changed file needs a higher `version` number. A request keeps the definition version it was created with, so requests raised on version 1 keep the old cancel rule.
+Any step may carry `"locksCancel": true`. Once that step is done the request can no longer be cancelled: Cancel disappears from the available actions and a Cancel attempt is refused with the error code `CANCEL_LOCKED`. Before that point the requester can cancel as usual, including while the locking step itself is the current one. Stationery sets it on `issue` and courier on `dispatch`; stationery is at version 2 and courier at version 5 (version 3 made the description field a longer "What are you sending?" box with help text; version 4 added the proof of delivery upload step; version 5 fills the sender name from the requester). Definition sync only adds new versions, so a changed file needs a higher `version` number. A request keeps the definition version it was created with, so requests raised on version 1 keep the old cancel rule.
 
 Only the requester can cancel; the Admin, System admin and Management cannot cancel someone else's request, and the lock applies to the requester. Reject is never locked: besides the holder of an approval step, the Admin can reject an in-progress request at any step, including a task step. System admin and Management have organisation-wide read-only visibility (every request and its audit trail) and no override; System admin is a technical role for configuration. Either way a reason is required for Reject and Cancel, and a reject always ends the request as Rejected with approval status Rejected.
 

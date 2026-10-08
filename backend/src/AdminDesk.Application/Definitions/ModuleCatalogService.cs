@@ -84,7 +84,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
             field.FullWidth,
             (field.Options ?? Array.Empty<FieldOption>()).Select(o => new FieldOptionDto(o.Value, o.Label)).ToList(),
             field.LookupKind,
-            field.ShowWhen is { } rule ? new ShowWhenDto(rule.Field, rule.Value) : null);
+            field.ShowWhen is { } rule ? new ShowWhenDto(rule.Field, rule.Value) : null,
+            field.DefaultFrom is { } source ? System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(source.ToString()) : null);
 
     public static ModuleDefinitionDto ToDto(IssuedDefinition issued)
     {

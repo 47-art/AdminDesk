@@ -5,6 +5,7 @@ using AdminDesk.Application.Requests;
 using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Enums;
 using AdminDesk.SharedKernel.Exceptions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AdminDesk.Infrastructure.Requests;
@@ -446,10 +447,43 @@ internal sealed class EngineProbeModuleChecks
 
     // ------------------------------------------------------------------ 45 courier
 
+    private static string BadDefaultDefinition(string source, string type) =>
+        "{ \"code\": \"defaultcheck\", \"version\": 1, \"name\": \"Default check\", \"description\": \"x\", \"category\": \"Visitors and others\", " +
+        "\"icon\": \"pi-send\", \"prefix\": \"DFC\", \"subject\": \"{name}\", " +
+        "\"fields\": [ { \"key\": \"name\", \"label\": \"Name\", \"type\": \"" + type + "\", \"defaultFrom\": \"" + source + "\" } ], " +
+        "\"steps\": [ { \"key\": \"review\", \"name\": \"Review\", \"type\": \"task\", \"actor\": { \"roles\": [\"Admin\"] } } ], \"limits\": [] }";
+
+    private static AdminDesk.Infrastructure.Definitions.DefinitionReadResult ReadFrom(string folder) =>
+        new AdminDesk.Infrastructure.Definitions.DefinitionFileReader(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?> { [ConfigKeys.DefinitionsOverrideDirectory] = folder })
+            .Build()).Read();
+
     private async Task CourierAsync()
     {
         var courier = await _k.Definitions.GetActiveAsync("courier");
-        _k.Check(courier is not null && courier.Definition.Version == 4, "45: the active courier definition is not version 4");
+        _k.Check(courier is not null && courier.Definition.Version == 5, "45: the active courier definition is not version 5");
+
+        // The sender name starts from the requester's name; an unknown source is refused when definitions load.
+        var sender = courier!.Definition.Fields!.Single(f => f.Key == "senderName");
+        _k.Check(AdminDesk.Application.Definitions.ModuleCatalogService.FieldDtoFor(sender).DefaultFrom == "requesterName",
+            "45: the courier sender name does not default from the requester name");
+        var folder = Directory.CreateTempSubdirectory("admindesk-defaults").FullName;
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(folder, "bad.json"), BadDefaultDefinition("somethingElse", "text"));
+            var unknown = ReadFrom(folder);
+            _k.Check(unknown.Problems.Any(p => p.Contains("defaultFrom") && p.Contains("somethingElse")),
+                "45: an unknown defaultFrom value was not rejected when definitions load");
+            await File.WriteAllTextAsync(Path.Combine(folder, "bad.json"), BadDefaultDefinition("requesterName", "number"));
+            var wrongType = ReadFrom(folder);
+            var problems = wrongType.Problems.Concat(AdminDesk.Domain.Definitions.DefinitionValidator.Validate(
+                wrongType.Definitions.Select(d => (d.File, d.Definition)).ToList(), _k.Lookups.Kinds));
+            _k.Check(problems.Any(p => p.Contains("defaultFrom")), "45: a defaultFrom on a number field was not rejected");
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
 
         var id = await _k.CreateAsync(_k.Requester, "courier", new
         {

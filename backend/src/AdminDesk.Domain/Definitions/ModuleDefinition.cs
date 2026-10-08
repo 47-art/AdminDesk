@@ -52,6 +52,9 @@ public sealed record FieldDefinition
     // When set, the field is shown, required and checked only while the named earlier field
     // of the same list holds this value; otherwise it is ignored and left out of what is stored.
     public ShowWhenRule? ShowWhen { get; init; }
+
+    // Text fields only: the form starts with this value instead of an empty box. It stays editable.
+    public FieldDefaultSource? DefaultFrom { get; init; }
 }
 
 public sealed record ShowWhenRule
