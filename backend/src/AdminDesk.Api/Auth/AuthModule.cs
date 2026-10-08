@@ -17,6 +17,7 @@ public sealed class AuthModule : IServiceModule
         services.AddSingleton(settings);
         services.AddSingleton(TimeProvider.System);
         services.AddSingleton<ITokenService, JwtTokenService>();
+        services.AddScoped<ClaimsActorContextFactory>();
 
         services
             .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
