@@ -103,7 +103,8 @@ public sealed class ModuleCatalogService : IModuleCatalogService
                 s.Type.ToString(),
                 ActorLabelFor(s),
                 s.ActionLabel,
-                (s.CaptureFields ?? Array.Empty<FieldDefinition>()).Select(FieldDtoFor).ToList()))
+                (s.CaptureFields ?? Array.Empty<FieldDefinition>()).Select(FieldDtoFor).ToList(),
+                s.RequiresDocument))
             .ToList();
 
         return new ModuleDefinitionDto(

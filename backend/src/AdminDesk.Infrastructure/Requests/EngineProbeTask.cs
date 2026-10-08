@@ -3,6 +3,7 @@ using System.Text.Json;
 using AdminDesk.Application.Abstractions;
 using AdminDesk.Application.Abstractions.Persistence;
 using AdminDesk.Application.Definitions;
+using AdminDesk.Application.Documents;
 using AdminDesk.Application.Engine;
 using AdminDesk.Application.Masters;
 using AdminDesk.Application.Requests;
@@ -157,6 +158,7 @@ public sealed class EngineProbeTask : IStartupTask
 
             await new CoreChecks(kit).RunAsync(ct);
             await new EngineProbeRoutingChecks(kit).RunAsync(ct);
+            await new EngineProbeDocumentChecks(kit).RunAsync(ct);
             _logger.LogInformation("ENGINE PROBE PASSED ({Count} checks)", kit.Passed);
         }
         catch (Exception ex)
@@ -219,6 +221,9 @@ internal sealed class ProbeKit
     public IDbConnectionFactory Factory { get; private init; } = null!;
     public TimeProvider Clock { get; private init; } = null!;
     public ProbeSwitch Switch { get; private init; } = null!;
+    public IDocumentService Documents { get; private init; } = null!;
+    public IDocumentFileStore Files { get; private init; } = null!;
+    public DocumentSettings DocumentLimits { get; private init; } = null!;
     public ILogger Logger { get; private init; } = null!;
 
     public ActorContext Requester { get; private set; } = null!;
@@ -240,6 +245,9 @@ internal sealed class ProbeKit
     public List<long> Created { get; } = new();
     public Dictionary<string, int> CreatedByPrefix { get; } = new();
 
+    // Courier requests the core checks leave at the proof of delivery step; the document checks finish them.
+    public List<long> CourierAtProof { get; } = new();
+
     public static async Task<ProbeKit> CreateAsync(IServiceProvider services, ILogger logger, CancellationToken ct)
     {
         var kit = new ProbeKit
@@ -251,6 +259,9 @@ internal sealed class ProbeKit
             Factory = (IDbConnectionFactory)services.GetService(typeof(IDbConnectionFactory))!,
             Clock = (TimeProvider)services.GetService(typeof(TimeProvider))!,
             Switch = (ProbeSwitch)services.GetService(typeof(ProbeSwitch))!,
+            Documents = (IDocumentService)services.GetService(typeof(IDocumentService))!,
+            Files = (IDocumentFileStore)services.GetService(typeof(IDocumentFileStore))!,
+            DocumentLimits = (DocumentSettings)services.GetService(typeof(DocumentSettings))!,
             Logger = logger
         };
         await kit.BuildActorsAsync(ct);
@@ -723,7 +734,7 @@ internal sealed class CoreChecks
         var rd = await _k.RequestAsync(d);
         var steps = await _k.StepsAsync(d);
         _k.Check(rd.RequestNo.StartsWith("CUR-"), "11: request number does not start with CUR-");
-        _k.Check(steps.Select(s => s.StepKey).SequenceEqual(new[] { "courier-selection", "dispatch", "tracking-number", "delivery-confirmation" }), "11: unexpected courier steps");
+        _k.Check(steps.Select(s => s.StepKey).SequenceEqual(new[] { "courier-selection", "dispatch", "tracking-number", "delivery-confirmation", "pod-upload" }), "11: unexpected courier steps");
         _k.Check(steps.All(s => s.StepType == "Task" && s.State != "NotRequired"), "11: courier steps are not all required tasks");
         _k.Check(rd.ApprovalStatus == "Approved" && rd.CurrentStepKey == "courier-selection" && rd.ResponsibleRole == "Admin", "11: courier start state is wrong");
 
@@ -744,7 +755,11 @@ internal sealed class CoreChecks
         await _k.ExpectNotAllowedAsync("5: approve the delivery confirmation", () => _k.ActAsync(_k.Requester, d, RequestAction.Approve));
         await _k.ExpectNotAllowedAsync("5: reject the delivery confirmation", () => _k.ActAsync(_k.Requester, d, RequestAction.Reject, "no"));
         await _k.ActAsync(_k.Requester, d, RequestAction.Complete);
-        _k.Check((await _k.RequestAsync(d)).CurrentStatus == "Closed", "11: courier request did not close");
+        // The proof of delivery step is the last one: the request stays open for the Admin until a document is uploaded.
+        rd = await _k.RequestAsync(d);
+        _k.Check(rd.CurrentStatus == "InProgress" && rd.CurrentStepKey == "pod-upload" && rd.ResponsibleRole == "Admin" && rd.ClosedUtc is null,
+            "11: courier request is not waiting for the Admin at pod-upload after the delivery confirmation");
+        _k.CourierAtProof.Add(d);
         _k.Pass("11 courier on the same engine");
 
         var selection = await _k.StepAsync(d, "courier-selection");
@@ -771,7 +786,10 @@ internal sealed class CoreChecks
         await _k.ActAsync(_k.Admin, e, RequestAction.Complete, null, new() { ["trackingNumber"] = ProbeKit.Json("TRK999") });
         await _k.ExpectCancelLockedAsync("7: cancel at the courier delivery confirmation", _k.Requester, e, "parcel not needed");
         await _k.ActAsync(_k.Requester, e, RequestAction.Complete);
-        _k.Check((await _k.RequestAsync(e)).CurrentStatus == "Closed", "7: the locked courier request could not be finished");
+        var re = await _k.RequestAsync(e);
+        _k.Check(re.CurrentStatus == "InProgress" && re.CurrentStepKey == "pod-upload", "7: the locked courier request is not at pod-upload after the delivery confirmation");
+        await _k.ExpectCancelLockedAsync("7: cancel at the courier proof of delivery step", _k.Requester, e, "parcel not needed");
+        _k.CourierAtProof.Add(e);
         _k.Pass("12 captured values");
 
         await RunAdminOverrideAsync(courier);

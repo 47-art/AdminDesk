@@ -131,6 +131,7 @@ The process description leaves some things open. What was chosen:
 14. The Management role exists, but no shipped module routes to Management yet: approval by Management arrives with the modules whose approval rules need it, so a Management login sees an empty Waiting for me list. Management is read-only across the organisation (every request, the All requests page, organisation counters and the audit trail) and approves only at steps assigned to it, as limits are configured. The System admin is a technical role: it configures definitions, limits and background jobs as those screens arrive, takes no business actions and is not part of any approval chain. Its menu is minimal (Dashboard and People for now); the request lists and New request are closed to it, while a direct link to a request still opens read-only for support. Only the Admin has the operational override (reject at any step).
 15. Segregation of duties: the process description does not say whether a person may approve their own request, so nobody can approve or reject their own request at an approval step, even when they hold the role of that step (for example a Store person raising a stationery request cannot do the Admin or Store verification; an Admin can). Task steps (issuing, stock confirmation, receipt confirmation) are not affected, and the Admin's operational reject override still applies.
 16. The people directory (the People page in the menu) is open to managers, Admin, HR, Management and System admin. Managers see their direct reports; the others see everyone. Each row shows the code, name, designation, department and location; email addresses are not shown.
+17. The process description does not say who completes the courier proof of delivery upload, so it is a task for the Admin, after the requester has confirmed delivery. The step cannot be completed until a document has been uploaded for it.
 
 ## Not yet built
 
@@ -138,7 +139,7 @@ The process description leaves some things open. What was chosen:
 - the jobs dashboard
 - a definitions viewer and a limits editor
 - document upload: the documents slot on the request page is reserved, and supporting documents are only partially covered until upload exists
-- the proof-of-delivery upload step of the courier flow (it arrives with document upload)
+- the upload screen for the courier proof-of-delivery step: the step is defined and the server refuses to complete it without a document, but the web upload control is not built yet
 - the automatic stock effect of the stock update step
 - notifications and background business jobs
 - other modules

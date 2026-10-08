@@ -3,6 +3,7 @@ using System.Text.Json;
 using AdminDesk.Application.Abstractions;
 using AdminDesk.Application.Abstractions.Persistence;
 using AdminDesk.Application.Definitions;
+using AdminDesk.Application.Documents;
 using AdminDesk.Application.Masters;
 using AdminDesk.Domain.Definitions;
 using AdminDesk.Domain.Engine;
@@ -30,6 +31,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRequestRepository _requests;
     private readonly IAuditRepository _audit;
+    private readonly IDocumentRepository _documents;
     private readonly IDefinitionProvider _definitions;
     private readonly ILimitRepository _limits;
     private readonly IEmployeeRepository _employees;
@@ -44,6 +46,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         IUnitOfWork unitOfWork,
         IRequestRepository requests,
         IAuditRepository audit,
+        IDocumentRepository documents,
         IDefinitionProvider definitions,
         ILimitRepository limits,
         IEmployeeRepository employees,
@@ -57,6 +60,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         _unitOfWork = unitOfWork;
         _requests = requests;
         _audit = audit;
+        _documents = documents;
         _definitions = definitions;
         _limits = limits;
         _employees = employees;
@@ -340,6 +344,11 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         IReadOnlyDictionary<string, object?>? captured = null;
         if (command.Action == RequestAction.Complete)
         {
+            if (definitionStep.RequiresDocument &&
+                await _documents.CountForStepAsync(tx, request.Id, current.StepKey, ct) == 0)
+            {
+                throw new ValidationException("file", "Upload a document for this step first", ErrorCodes.DOCUMENT_REQUIRED);
+            }
             captured = await _validator.ValidateCapturedAsync(definitionStep.CaptureFields, command.Captured, ct);
         }
 

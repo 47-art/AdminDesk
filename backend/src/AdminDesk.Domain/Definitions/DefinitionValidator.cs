@@ -121,6 +121,10 @@ public static class DefinitionValidator
             {
                 problems.Add($"{Where()}: step '{step.Key}' is not a task step, so it cannot have capture fields");
             }
+            if (step.RequiresDocument && step.Type != StepType.Task)
+            {
+                problems.Add($"{Where()}: step '{step.Key}' is not a task step, so it cannot require a document");
+            }
             var captureKeys = new HashSet<string>(StringComparer.Ordinal);
             foreach (var field in capture)
             {

@@ -21,7 +21,8 @@ public sealed record RequestStepDto(
     string? Comment,
     bool IsCurrent,
     IReadOnlyDictionary<string, object?>? Captured,
-    IReadOnlyList<FieldDto> CaptureFields);
+    IReadOnlyList<FieldDto> CaptureFields,
+    bool RequiresDocument);
 
 public sealed record RequestDetailDto(
     long Id,
@@ -78,7 +79,8 @@ public sealed record RequestListItem(
     string? RequesterDepartment,
     int AgeDays,
     string? PrimaryActionLabel,
-    IReadOnlyList<FieldDto> CaptureFields);
+    IReadOnlyList<FieldDto> CaptureFields,
+    bool RequiresDocument);
 
 public sealed record AuditEventDto(
     long Id,

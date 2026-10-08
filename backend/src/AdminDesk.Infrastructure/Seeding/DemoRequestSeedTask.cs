@@ -107,7 +107,7 @@ public sealed class DemoRequestSeedTask : IStartupTask
             await StationeryAsync(priya, "Desk organiser", 1, Ago(18),
                 new[] { new Move(priya, RequestAction.Cancel, "Raised by mistake, the items are no longer needed") }, ct);
 
-            // Courier requests.
+            // Courier requests. The last step needs an uploaded document, so none of them is closed here.
             await CourierAsync(priya, "Rao Associates", "Pune", Ago(2), Array.Empty<Move>(), ct);
             await CourierAsync(priya, "Mehta Traders", "Mumbai", Ago(6), new[]
             {

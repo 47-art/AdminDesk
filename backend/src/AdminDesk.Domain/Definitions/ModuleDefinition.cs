@@ -68,6 +68,9 @@ public sealed record StepDefinition
 
     // When true, the request can no longer be cancelled once this step is done.
     public bool LocksCancel { get; init; }
+
+    // When true, a task step cannot be completed until a document has been uploaded for it.
+    public bool RequiresDocument { get; init; }
 }
 
 // A group (Any or All) or a leaf rule (Field, Op and either Value or Limit).

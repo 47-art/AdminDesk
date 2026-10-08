@@ -105,7 +105,8 @@ public sealed class RequestQueryService : IRequestQueryService
                 row.Comment,
                 currentSeq == row.Seq && row.State != StepState.Upcoming,
                 captured,
-                captureFields.Select(ModuleCatalogService.FieldDtoFor).ToList()));
+                captureFields.Select(ModuleCatalogService.FieldDtoFor).ToList(),
+                stepDefinition?.RequiresDocument ?? false));
         }
 
         var current = currentSeq is { } seq ? steps.FirstOrDefault(x => x.Seq == seq) : null;
@@ -334,7 +335,8 @@ public sealed class RequestQueryService : IRequestQueryService
                 row.RequesterDepartment,
                 AgeDays(row.RequestDate, row.ClosedUtc),
                 AllowedActionsCalculator.PrimaryLabel(status, step?.Type, step?.ActionLabel),
-                (step?.CaptureFields ?? Array.Empty<FieldDefinition>()).Select(ModuleCatalogService.FieldDtoFor).ToList()));
+                (step?.CaptureFields ?? Array.Empty<FieldDefinition>()).Select(ModuleCatalogService.FieldDtoFor).ToList(),
+                step?.RequiresDocument ?? false));
         }
         return items;
     }

@@ -31,7 +31,8 @@ public sealed record StepSummaryDto(
     string Type,
     string ActorLabel,
     string? ActionLabel,
-    IReadOnlyList<FieldDto> CaptureFields);
+    IReadOnlyList<FieldDto> CaptureFields,
+    bool RequiresDocument);
 
 public sealed record ModuleDefinitionDto(
     long DefinitionId,

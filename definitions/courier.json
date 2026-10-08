@@ -1,8 +1,8 @@
 {
   "code": "courier",
-  "version": 3,
+  "version": 4,
   "name": "Courier request",
-  "description": "Send a document or parcel by courier. Admin selects the courier, dispatches it and records the tracking number; the requester confirms delivery.",
+  "description": "Send a document or parcel by courier. Admin selects the courier, dispatches it and records the tracking number; the requester confirms delivery; Admin then uploads the proof of delivery.",
   "category": "Visitors and others",
   "icon": "pi-send",
   "prefix": "CUR",
@@ -30,7 +30,8 @@
         { "key": "trackingNumber", "label": "Tracking number", "type": "text", "required": true, "maxLength": 60 }
       ]
     },
-    { "key": "delivery-confirmation", "name": "Delivery confirmation", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm delivery" }
+    { "key": "delivery-confirmation", "name": "Delivery confirmation", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm delivery" },
+    { "key": "pod-upload", "name": "Proof of delivery upload", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Complete proof of delivery", "requiresDocument": true }
   ],
   "limits": []
 }
