@@ -2,6 +2,7 @@ using System.Globalization;
 using AdminDesk.Application.Auth;
 using AdminDesk.Application.Masters;
 using AdminDesk.SharedKernel.Constants;
+using AdminDesk.SharedKernel.Exceptions;
 using AdminDesk.SharedKernel.Responses;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,10 +15,12 @@ namespace AdminDesk.Api.Controllers;
 public class MeController : ControllerBase
 {
     private readonly IEmployeeRepository _employees;
+    private readonly IMasterAssetService _holdings;
 
-    public MeController(IEmployeeRepository employees)
+    public MeController(IEmployeeRepository employees, IMasterAssetService holdings)
     {
         _employees = employees;
+        _holdings = holdings;
     }
 
     [HttpGet]
@@ -47,5 +50,16 @@ public class MeController : ControllerBase
         }
 
         return Ok(ApiResponse<MeDto>.Ok(new MeDto(id, name, email, employeeId, code, department, designation, roles)));
+    }
+
+    // The SIMs, assets and ID card the caller holds now. Only the caller's own items are returned.
+    [HttpGet("holdings")]
+    public async Task<ActionResult<ApiResponse<HoldingsDto>>> Holdings(CancellationToken ct)
+    {
+        if (!long.TryParse(User.FindFirst(Claims.EmployeeId)?.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var employeeId))
+        {
+            throw new ForbiddenException("Your sign-in has no employee profile.", ErrorCodes.NO_EMPLOYEE_PROFILE);
+        }
+        return Ok(ApiResponse<HoldingsDto>.Ok(await _holdings.GetHoldingsAsync(employeeId, ct)));
     }
 }

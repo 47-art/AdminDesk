@@ -160,6 +160,7 @@ public sealed class EngineProbeTask : IStartupTask
             await new EngineProbeRoutingChecks(kit).RunAsync(ct);
             await new EngineProbeDocumentChecks(kit).RunAsync(ct);
             await new EngineProbeConfigChecks(kit).RunAsync(ct);
+            await new EngineProbeMasterChecks(kit).RunAsync(ct);
             _logger.LogInformation("ENGINE PROBE PASSED ({Count} checks)", kit.Passed);
         }
         catch (Exception ex)
@@ -233,6 +234,7 @@ internal sealed class ProbeKit
     public ActorContext Admin { get; private set; } = null!;
     public ActorContext SysAdmin { get; private set; } = null!;
     public ActorContext Hr { get; private set; } = null!;
+    public ActorContext It { get; private set; } = null!;
     public ActorContext Store { get; private set; } = null!;
     public ActorContext Security { get; private set; } = null!;
     public ActorContext Management { get; private set; } = null!;
@@ -278,6 +280,7 @@ internal sealed class ProbeKit
         Admin = await ActorAsync("E0005", ct, Roles.Employee, Roles.Admin);
         SysAdmin = await ActorAsync("E0008", ct, Roles.Employee, Roles.SystemAdmin);
         Hr = await ActorAsync("E0003", ct, Roles.Employee, Roles.HR);
+        It = await ActorAsync("E0004", ct, Roles.Employee, Roles.IT);
         Store = await ActorAsync("E0006", ct, Roles.Employee, Roles.Store);
         Security = await ActorAsync("E0007", ct, Roles.Employee, Roles.Security);
         Management = await ActorAsync("E0001", ct, Roles.Employee, Roles.Management);
