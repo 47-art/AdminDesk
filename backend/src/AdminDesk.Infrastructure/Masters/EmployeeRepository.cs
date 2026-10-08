@@ -26,8 +26,8 @@ public sealed class EmployeeRepository : IEmployeeRepository
         "LEFT JOIN locations l ON l.id = e.location_id ";
 
     private const string TeamColumns =
-        "SELECT e.id AS Id, e.employee_code AS Code, e.full_name AS FullName, e.email AS Email, " +
-        "e.designation AS Designation, d.name AS DepartmentName, l.name AS LocationName ";
+        "SELECT e.id AS EmployeeId, e.employee_code AS Code, e.full_name AS Name, " +
+        "e.designation AS Designation, d.name AS Department, l.name AS Location ";
 
     private readonly IDbConnectionFactory _factory;
     private readonly ISqlDialect _dialect;

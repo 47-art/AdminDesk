@@ -16,12 +16,11 @@ public sealed record EmployeeRecord(
 public sealed record LookupItem(long Id, string Code, string Label, string? Secondary);
 
 public sealed record TeamMemberRow(
-    long Id,
+    long EmployeeId,
     string Code,
-    string FullName,
-    string? Email,
+    string Name,
     string? Designation,
-    string? DepartmentName,
-    string? LocationName);
+    string? Department,
+    string? Location);
 
 public sealed record PagedResult<T>(IReadOnlyList<T> Items, int Total, int Page, int PageSize);

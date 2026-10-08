@@ -73,6 +73,20 @@ process.stdin.on("data", c => s += c).on("end", () => {
 
 jget() { jx "$BODY" "$1"; }
 
+# assert_keys NAME JS-EXPRESSION EXPECTED-KEYS  - the object has exactly this set of JSON keys (comma list, any order).
+assert_keys() {
+  local got want
+  got=$(jget "Object.keys($2).sort().join(',')")
+  want=$(printf '%s' "$3" | tr ',' '
+' | sort | paste -sd, -)
+  if [ "$got" = "$want" ]; then pass "$1"; else fail "$1" "(expected keys '$want', got '$got')"; fi
+}
+
+# assert_filled NAME JS-EXPRESSION  - the value is a non-empty string.
+assert_filled() {
+  assert_true "$1" "$(jget "typeof ($2) === 'string' && ($2).trim().length > 0")"
+}
+
 # call METHOD PATH [TOKEN] [JSON-BODY]  ->  STATUS, BODY, response headers in $TMP/hdr
 call() {
   local method=$1 path=$2 token=${3-} body=${4-}
@@ -284,6 +298,61 @@ main_mode() {
 
   call GET "/api/requests/inbox?page=1&pageSize=100" "$T_ADM"
   assert_true "demo data: the admin has a courier selection waiting that asks for the company"     "$(jget 'd.data.items.some(i => i.moduleCode === "courier" && i.currentStepName === "Courier selection" && i.captureFields.some(f => f.key === "courierCompany"))')"
+
+  # ------------------------------------------------- response shapes (field names the web app reads)
+  LIST_KEYS="id,requestNo,moduleCode,moduleName,subject,requestDate,requiredDate,priority,currentStatus,currentStepName,currentStepType,responsibleName,responsibleRole,updatedUtc,requesterName,requesterDepartment,ageDays,primaryActionLabel,captureFields"
+  FIELD_KEYS="key,label,type,required,maxLength,min,max,helpText,fullWidth,options,lookupKind"
+  call GET "/api/team?page=1&pageSize=5" "$T_ADM"
+  assert_status "shape: team directory answers 200 for admin" 200
+  assert_keys "shape: team envelope" d.data items,total,page,pageSize
+  assert_keys "shape: team row has the contract fields and no email" d.data.items[0] employeeId,code,name,designation,department,location
+  assert_filled "shape: team row name is filled" d.data.items[0].name
+  assert_filled "shape: team row department is filled" d.data.items[0].department
+  assert_filled "shape: team row location is filled" d.data.items[0].location
+  assert_true "shape: every team row has name, department and location" "$(jget 'd.data.items.every(r => r.name && r.department && r.location)')"
+  call GET /api/config/public
+  assert_keys "shape: public config" d.data demoMode,demoPassword,demoAccounts
+  assert_keys "shape: demo account" d.data.demoAccounts[0] role,name,email,description
+  call GET /api/me "$T_EMP"
+  assert_status "shape: me answers 200" 200
+  assert_keys "shape: me" d.data id,name,email,employeeId,employeeCode,department,designation,roles
+  call POST /api/auth/login "" "{\"email\":\"employee@demo.test\",\"password\":\"$DEMO_PASSWORD\"}"
+  assert_keys "shape: login response" d.data accessToken,expiresAtUtc,user
+  assert_keys "shape: login user" d.data.user id,name,email,employeeId,roles
+  call GET /api/modules "$T_EMP"
+  assert_keys "shape: module list item" d.data[0] code,name,description,category,icon,prefix
+  call GET /api/modules/courier "$T_EMP"
+  assert_keys "shape: module definition" d.data definitionId,code,version,name,description,category,icon,prefix,sections,steps
+  assert_keys "shape: module section" d.data.sections[0] title,fields
+  assert_keys "shape: module field" d.data.sections[0].fields[0] "$FIELD_KEYS"
+  assert_keys "shape: module step summary" d.data.steps[0] key,name,type,actorLabel,actionLabel,captureFields
+  call GET "/api/lookups/department?take=3" "$T_EMP"
+  assert_keys "shape: lookup item" d.data[0] id,code,label,secondary
+  call GET "/api/requests/mine?page=1&pageSize=5" "$T_EMP"
+  assert_keys "shape: mine envelope" d.data items,total,page,pageSize
+  assert_keys "shape: mine row" d.data.items[0] "$LIST_KEYS"
+  call GET "/api/requests/inbox?page=1&pageSize=5" "$T_MGR"
+  assert_keys "shape: waiting-for-me row" d.data.items[0] "$LIST_KEYS"
+  call GET "/api/requests/team?page=1&pageSize=5" "$T_MGR"
+  assert_keys "shape: team requests row" d.data.items[0] "$LIST_KEYS"
+  call GET /api/requests/inbox/count "$T_MGR"
+  assert_keys "shape: inbox count" d.data count
+  call GET "/api/requests/all?page=1&pageSize=5" "$T_ADM"
+  assert_keys "shape: all-requests envelope" d.data items,total,page,pageSize
+  assert_keys "shape: all-requests row" d.data.items[0] "$LIST_KEYS"
+  call GET /api/dashboard/summary "$T_EMP"
+  assert_status "shape: dashboard summary answers 200" 200
+  assert_keys "shape: dashboard summary" d.data waitingForMe,total,pending,approved,rejected,completed,cancelled,scope,recent
+  assert_keys "shape: dashboard recent row" d.data.recent[0] "$LIST_KEYS"
+  detail "$CANCELLED_ID" "$T_EMP"
+  assert_keys "shape: request detail" d.data id,requestNo,moduleCode,moduleName,definitionId,subject,rowVersion,requester,department,project,location,costCentre,requestDate,requiredDate,priority,approvalStatus,currentStatus,currentStepKey,currentStepName,responsible,remarks,payload,lookupLabels,ageDays,createdUtc,closedUtc,definition,steps,allowedActions,primaryActionLabel,cancelReason,cancelledUtc,stoppedByName,stoppedByRole
+  assert_keys "shape: request requester" d.data.requester employeeId,employeeCode,name,department
+  assert_keys "shape: request responsible" d.data.responsible name,role
+  assert_keys "shape: request step" d.data.steps[0] seq,key,name,type,state,actorLabel,actedByName,actedUtc,comment,isCurrent,captured,captureFields
+  assert_keys "shape: request definition" d.data.definition definitionId,code,version,name,description,category,icon,prefix,sections,steps
+  call GET "/api/requests/$CANCELLED_ID/audit" "$T_SYS"
+  assert_status "shape: audit answers 200 for the system admin" 200
+  assert_keys "shape: audit row" d.data[0] id,eventType,actorName,actorRole,stepKey,stepName,fromStatus,toStatus,comment,createdUtc
 
   # ------------------------------------------------- walk 1: stationery
   create "$T_EMP" "$(stn_body 'A4 paper' 5 'Please deliver to desk 12')"
@@ -841,7 +910,7 @@ main_mode() {
   assert_true "team requests: Manager's list holds the direct report's request" "$(jget "d.data.items.some(i => i.id === $TEAM_R)")"
   assert_true "team requests: Manager's list does not hold the non-team request" "$(jget "d.data.items.every(i => i.id !== $OTHER_R)")"
   call GET "/api/team?pageSize=100" "$T_MGR"
-  TEAM_NAMES=$(jget 'JSON.stringify(d.data.items.map(i => i.fullName))')
+  TEAM_NAMES=$(jget 'JSON.stringify(d.data.items.map(i => i.name))')
   call GET "/api/requests/team?pageSize=100" "$T_MGR"
   assert_true "team requests: every row was raised by a direct report" \
     "$(jget "d.data.items.length > 0 && d.data.items.every(i => $TEAM_NAMES.includes(i.requesterName))")"
