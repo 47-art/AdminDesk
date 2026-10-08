@@ -14,6 +14,7 @@ using AdminDesk.SharedKernel.Time;
 using Dapper;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace AdminDesk.Infrastructure.Requests;
@@ -111,9 +112,12 @@ public sealed class EngineProbeTask : IStartupTask
     private readonly IConfiguration _configuration;
     private readonly IServiceProvider _services;
     private readonly ILogger<EngineProbeTask> _logger;
+    private readonly IHostEnvironment _environment;
 
-    public EngineProbeTask(IConfiguration configuration, IServiceProvider services, ILogger<EngineProbeTask> logger)
+    public EngineProbeTask(
+        IConfiguration configuration, IServiceProvider services, ILogger<EngineProbeTask> logger, IHostEnvironment environment)
     {
+        _environment = environment;
         _configuration = configuration;
         _services = services;
         _logger = logger;
@@ -128,6 +132,15 @@ public sealed class EngineProbeTask : IStartupTask
         {
             _logger.LogInformation("Engine probe skipped (Diagnostics:RunEngineProbe is false)");
             return;
+        }
+
+        // The probe creates requests and runs raw UPDATE statements, so it only runs on a development
+        // machine with demo mode on; anywhere else the host refuses to start with it switched on.
+        var demo = bool.TryParse(_configuration[ConfigKeys.DemoEnabled], out var demoEnabled) && demoEnabled;
+        if (!_environment.IsDevelopment() || !demo)
+        {
+            throw new InvalidOperationException(
+                $"{ConfigKeys.DiagnosticsRunEngineProbe} may only be switched on in the Development environment with {ConfigKeys.DemoEnabled} set to true.");
         }
 
         _logger.LogInformation("Engine probe running on this data folder; use a throwaway folder only (mode {Mode})", mode);
