@@ -198,7 +198,9 @@ public sealed class RequestRepository : IRequestRepository
             "OR EXISTS (SELECT 1 FROM employees rq WHERE rq.id = r.requester_employee_id " +
             "AND rq.reporting_manager_id = @EmployeeId) " +
             "OR EXISTS (SELECT 1 FROM request_steps s WHERE s.request_id = r.id AND s.acted_by_user_id = @UserId) " +
-            "OR EXISTS (SELECT 1 FROM request_step_actors a WHERE a.request_id = r.id AND a.is_active = 1 " +
+            "OR EXISTS (SELECT 1 FROM audit_events ev WHERE ev.request_id = r.id AND ev.actor_user_id = @UserId AND ev.event_type IN (" +
+            string.Join(", ", AuditSql.ActionEventTypes.Select(t => "'" + t + "'")) + ")) " +
+            "OR EXISTS (SELECT 1 FROM request_step_actors a WHERE a.request_id = r.id " +
             "AND (a.employee_id = @EmployeeId OR a.role_name IN @RoleNames))))";
         var parameters = new
         {

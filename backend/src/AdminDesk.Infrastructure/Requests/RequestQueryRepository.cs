@@ -137,11 +137,41 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
     public Task<PagedRows<RequestListRow>> ListTeamAsync(long managerEmployeeId, MineFilter filter, CancellationToken ct) =>
         ListFilteredAsync("re.reporting_manager_id = @Who", managerEmployeeId, filter, ct);
 
-    // One filter builder for the three request lists; only the "who" clause differs.
-    private async Task<PagedRows<RequestListRow>> ListFilteredAsync(
-        string? whoClause, long? who, MineFilter filter, CancellationToken ct)
+    // The caller took part in the request: acted on a step, or is or was named as an actor of one (by employee
+    // or by role), or did a step action or stopped the request according to the audit trail. Raising it does not count.
+    public async Task<PagedRows<RequestListRow>> ListHandledAsync(
+        long? employeeId, string userId, IReadOnlyCollection<string> roles, MineFilter filter, CancellationToken ct)
     {
         var parameters = new DynamicParameters();
+        parameters.Add("UserId", userId);
+        var assigned = new List<string>();
+        if (employeeId is { } employee)
+        {
+            assigned.Add("a.employee_id = @Employee");
+            parameters.Add("Employee", employee);
+        }
+        if (roles.Count > 0)
+        {
+            assigned.Add("a.role_name IN @Roles");
+            parameters.Add("Roles", roles.ToArray());
+        }
+        var clause =
+            "(EXISTS (SELECT 1 FROM request_steps s WHERE s.request_id = r.id AND s.acted_by_user_id = @UserId) " +
+            "OR EXISTS (SELECT 1 FROM audit_events ev WHERE ev.request_id = r.id AND ev.actor_user_id = @UserId AND ev.event_type IN (" +
+            string.Join(", ", AuditSql.ActionEventTypes.Select(t => "'" + t + "'")) + "))" +
+            (assigned.Count == 0
+                ? string.Empty
+                : " OR EXISTS (SELECT 1 FROM request_step_actors a WHERE a.request_id = r.id AND (" + string.Join(" OR ", assigned) + "))") +
+            ")";
+        return await ListFilteredAsync(clause, null, filter, ct, parameters, "r.updated_utc DESC, r.id DESC");
+    }
+
+    // One filter builder for the request lists; only the "who" clause differs.
+    private async Task<PagedRows<RequestListRow>> ListFilteredAsync(
+        string? whoClause, long? who, MineFilter filter, CancellationToken ct,
+        DynamicParameters? extra = null, string? defaultOrder = null)
+    {
+        var parameters = extra ?? new DynamicParameters();
         var where = new List<string> { AuditSql.Active("r") };
         if (whoClause is not null)
         {
@@ -180,7 +210,7 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
             parameters.Add("To", to.ToString(DateFormat, CultureInfo.InvariantCulture));
         }
 
-        var orderBy = OrderBy(filter.Sort, filter.Dir);
+        var orderBy = defaultOrder is not null && string.IsNullOrWhiteSpace(filter.Sort) ? defaultOrder : OrderBy(filter.Sort, filter.Dir);
         return await PageAsync(where, parameters, orderBy, filter.Page, filter.PageSize, ct);
     }
 

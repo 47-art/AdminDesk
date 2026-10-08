@@ -69,6 +69,14 @@ internal sealed class EngineProbeModuleChecks
 
     // ------------------------------------------------------------------ helpers
 
+    private async Task<HashSet<long>> HandledIdsAsync(ActorContext actor)
+    {
+        using var scope = _k.Services.CreateScope();
+        var page = await scope.ServiceProvider.GetRequiredService<IRequestQueryService>()
+            .HandledAsync(actor, new MineQuery { PageSize = 100 }, default);
+        return page.Items.Select(i => i.Id).ToHashSet();
+    }
+
     private static JsonElement J(object? value) => ProbeKit.Json(value);
 
     private async Task AssertStepsAsync(long id, string module)
@@ -316,6 +324,33 @@ internal sealed class EngineProbeModuleChecks
         await _k.ExpectRefusedAsync("41: IT approving the Finance step", _k.It, costly, () => _k.ActAsync(_k.It, costly, RequestAction.Approve));
         await DoAsync(_k.Finance, costly, "finance-approval", RequestAction.Approve);
         await _k.ActAsync(_k.Requester, costly, RequestAction.Cancel, "Probe check finished");
+
+        // Once IT has approved and the request waits for Finance, it leaves IT's waiting list and stays findable in
+        // the handled list; people who took no part do not get it.
+        var handled = await _k.CreateAsync(_k.Requester, "laptop", new { assetType = "Desktop", requirement = "Design work", estimatedCost = 85000 });
+        await DoAsync(_k.Manager, handled, "manager-approval", RequestAction.Approve);
+        await DoAsync(_k.It, handled, "it-admin-verification", RequestAction.Approve);
+        await AtAsync(handled, "finance-approval", "41: the handled laptop request");
+        using (var scope = _k.Services.CreateScope())
+        {
+            var queries = scope.ServiceProvider.GetRequiredService<IRequestQueryService>();
+            var waiting = await queries.InboxAsync(_k.It, new InboxQuery { PageSize = 100 }, ct);
+            _k.Check(waiting.Items.All(i => i.Id != handled), "43: the request is still in IT's waiting list after IT approved");
+            _k.Check((await HandledIdsAsync(_k.It)).Contains(handled), "43: the request is missing from IT's handled list");
+            _k.Check((await queries.GetDetailAsync(_k.It, handled, ct)).Id == handled, "43: IT cannot open the request it handled");
+            _k.Check((await HandledIdsAsync(_k.Manager)).Contains(handled), "43: the manager who approved does not see the request as handled");
+            _k.Check((await HandledIdsAsync(_k.Finance)).Contains(handled), "43: Finance, assigned to the next step, does not see the request as handled");
+            _k.Check(!(await HandledIdsAsync(_k.Uninvolved)).Contains(handled), "43: an uninvolved employee has the request in the handled list");
+            _k.Check(!(await HandledIdsAsync(_k.Requester)).Contains(handled), "43: the requester who never acted has the request in the handled list");
+            await _k.ExpectAsync<NotFoundException>("43: an uninvolved employee opening the request", () => queries.GetDetailAsync(_k.Uninvolved, handled, ct));
+            var filtered = await queries.HandledAsync(_k.It, new MineQuery { Q = "zzz-no-such-request" }, ct);
+            _k.Check(filtered.Items.Count == 0 && filtered.Total == 0, "43: the handled list ignores the search text");
+            var none = await queries.HandledAsync(_k.NoEmployee, new MineQuery(), ct);
+            _k.Check(none.Items.Count == 0, "43: a caller with no employee record and no part in any request has handled requests");
+        }
+        await _k.ActAsync(_k.Requester, handled, RequestAction.Cancel, "Probe check finished");
+        _k.Check((await HandledIdsAsync(_k.Requester)).Contains(handled), "43: the requester who cancelled does not see the request as handled");
+        _k.Pass("43 handled list: acted or assigned users find the request, others do not");
 
         var (_, asset) = await LaptopAsync(ct);
         _k.Pass("41 laptop request: optional Finance step, allocation and master update");

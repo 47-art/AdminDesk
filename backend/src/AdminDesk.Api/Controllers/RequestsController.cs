@@ -58,6 +58,10 @@ public class RequestsController : ControllerBase
     public async Task<ActionResult<ApiResponse<PagedResult<RequestListItem>>>> Mine([FromQuery] MineQuery query, CancellationToken ct) =>
         Ok(ApiResponse<PagedResult<RequestListItem>>.Ok(await _queries.MineAsync(_actors.Create(User), query, ct)));
 
+    [HttpGet("handled")]
+    public async Task<ActionResult<ApiResponse<PagedResult<RequestListItem>>>> Handled([FromQuery] MineQuery query, CancellationToken ct) =>
+        Ok(ApiResponse<PagedResult<RequestListItem>>.Ok(await _queries.HandledAsync(_actors.Create(User), query, ct)));
+
     [HttpGet("all")]
     [Authorize(Policy = Policies.OrganisationWide)]
     public async Task<ActionResult<ApiResponse<PagedResult<RequestListItem>>>> All([FromQuery] MineQuery query, CancellationToken ct) =>

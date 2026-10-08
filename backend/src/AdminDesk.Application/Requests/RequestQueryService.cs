@@ -23,6 +23,8 @@ public interface IRequestQueryService
 
     Task<PagedResult<RequestListItem>> AllAsync(ActorContext actor, MineQuery query, CancellationToken ct);
 
+    Task<PagedResult<RequestListItem>> HandledAsync(ActorContext actor, MineQuery query, CancellationToken ct);
+
     Task<PagedResult<RequestListItem>> TeamAsync(ActorContext actor, MineQuery query, CancellationToken ct);
 
     Task<PagedResult<RequestListItem>> InboxAsync(ActorContext actor, InboxQuery query, CancellationToken ct);
@@ -205,6 +207,15 @@ public sealed class RequestQueryService : IRequestQueryService
 
         var filter = ToFilter(query, page, pageSize);
         var rows = await _repository.ListMineAsync(employeeId, filter, ct);
+        var items = await ToItemsAsync(rows.Items, ct);
+        return new PagedResult<RequestListItem>(items, rows.Total, page, pageSize);
+    }
+
+    public async Task<PagedResult<RequestListItem>> HandledAsync(ActorContext actor, MineQuery query, CancellationToken ct)
+    {
+        var page = Math.Max(1, query.Page);
+        var pageSize = Math.Clamp(query.PageSize, 1, RequestParsing.MaxPageSize);
+        var rows = await _repository.ListHandledAsync(actor.EmployeeId, actor.UserId, actor.Roles.ToArray(), ToFilter(query, page, pageSize), ct);
         var items = await ToItemsAsync(rows.Items, ct);
         return new PagedResult<RequestListItem>(items, rows.Total, page, pageSize);
     }

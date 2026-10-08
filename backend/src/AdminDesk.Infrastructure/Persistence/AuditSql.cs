@@ -6,6 +6,13 @@ namespace AdminDesk.Infrastructure.Persistence;
 // never removed; a delete is SoftDeleteSet.
 public static class AuditSql
 {
+    // Audit events that record somebody acting on a request; creating, system and document read events do not.
+    public static readonly string[] ActionEventTypes =
+    {
+        AuditEventTypes.StepApproved, AuditEventTypes.StepCompleted, AuditEventTypes.Rejected,
+        AuditEventTypes.Cancelled, AuditEventTypes.Closed
+    };
+
     public static string Active(string alias) => AuditColumns.ActiveFilter(alias);
 
     public const string InsertColumns =
