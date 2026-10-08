@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Injectable, computed, effect, inject, input, model, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Injectable, computed, effect, inject, input, model, output, signal, untracked } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { Observable, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -219,7 +219,8 @@ export class ActionDialogComponent {
         this.reason.reset('');
         this.touched.set(false);
         this.busy.set(false);
-        this.captureGroup.set(buildGroup(this.captureFields()));
+        // Read the fields without tracking them: only opening the dialog should reset it.
+        this.captureGroup.set(buildGroup(untracked(() => this.captureFields())));
       }
     });
   }
