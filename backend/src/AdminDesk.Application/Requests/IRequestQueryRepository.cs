@@ -93,6 +93,7 @@ public sealed class SummaryCounts
     public long Approved { get; set; }
     public long Rejected { get; set; }
     public long Completed { get; set; }
+    public long Cancelled { get; set; }
 }
 
 public sealed record PagedRows<T>(IReadOnlyList<T> Items, int Total);
@@ -129,7 +130,8 @@ public interface IRequestQueryRepository
 
     Task<int> CountInboxAsync(long? employeeId, IReadOnlyCollection<string> roles, CancellationToken ct);
 
-    Task<SummaryCounts> SummaryAsync(long employeeId, CancellationToken ct);
+    // employeeId is null for organisation-wide counters (no requester filter).
+    Task<SummaryCounts> SummaryAsync(long? employeeId, CancellationToken ct);
 
     // The latest requests the user raised or acted on.
     Task<IReadOnlyList<RequestListRow>> ListRecentAsync(long employeeId, string userId, int take, CancellationToken ct);

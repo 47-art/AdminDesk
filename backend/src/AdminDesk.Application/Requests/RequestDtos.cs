@@ -96,6 +96,15 @@ public sealed record DashboardSummary(
     int Approved,
     int Rejected,
     int Completed,
+    int Cancelled,
+    string Scope,
     IReadOnlyList<RequestListItem> Recent);
+
+// Whose requests the dashboard counters cover.
+public static class DashboardScopes
+{
+    public const string Organisation = "Organisation";
+    public const string Mine = "Mine";
+}
 
 public sealed record InboxCountDto(int Count);

@@ -214,7 +214,8 @@ main_mode() {
   T_SYS=$(login sysadmin@demo.test)
   T_HR=$(login hr@demo.test)
   T_SEC=$(login security@demo.test)
-  for t in "$T_EMP" "$T_MGR" "$T_ADM" "$T_STORE" "$T_SYS" "$T_HR" "$T_SEC"; do
+  T_MGT=$(login management@demo.test)
+  for t in "$T_EMP" "$T_MGR" "$T_ADM" "$T_STORE" "$T_SYS" "$T_HR" "$T_SEC" "$T_MGT"; do
     if [ "$t" = "null" ] || [ -z "$t" ]; then echo "FAIL demo sign-in (is demo mode on?)"; exit 1; fi
   done
 
@@ -606,6 +607,37 @@ main_mode() {
   assert_status "courier: requester cancels at courier selection" 200
   assert_eq "courier: status Cancelled" "$(jget d.data.currentStatus)" Cancelled
 
+  # ------------------------------------------------------- dashboard counters
+  call GET /api/dashboard/summary "$T_EMP"
+  assert_eq "dashboard: the employee sees their own scope" "$(jget d.data.scope)" Mine
+  assert_true "dashboard: cancelled is a number" "$(jget 'typeof d.data.cancelled === "number"')"
+  CANCELLED_BEFORE=$(jget d.data.cancelled)
+  create "$T_EMP" "$(stn_body Pens 2)"; R5=$RID
+  act "$R5" "$T_EMP" Cancel '"Dashboard check"'
+  assert_status "dashboard: a request to cancel is cancelled" 200
+  call GET /api/dashboard/summary "$T_EMP"
+  assert_eq "dashboard: cancelling raises the cancelled counter by one" "$(jget d.data.cancelled)" "$((CANCELLED_BEFORE + 1))"
+  EMP_TOTAL=$(jget d.data.total)
+  EMP_CANCELLED=$(jget d.data.cancelled)
+  call GET "/api/requests/mine?status=Cancelled&page=1&pageSize=1" "$T_EMP"
+  assert_eq "dashboard: cancelled equals the My requests Cancelled list" "$(jget d.data.total)" "$EMP_CANCELLED"
+  STATUS_SUM=0
+  for st in InProgress Closed Rejected Cancelled; do
+    call GET "/api/requests/mine?status=$st&page=1&pageSize=1" "$T_EMP"
+    STATUS_SUM=$((STATUS_SUM + $(jget d.data.total)))
+  done
+  assert_eq "dashboard: the status counts add up to the total" "$STATUS_SUM" "$EMP_TOTAL"
+  for who in "Admin:$T_ADM" "SystemAdmin:$T_SYS" "Management:$T_MGT"; do
+    call GET /api/dashboard/summary "${who#*:}"
+    assert_eq "dashboard: ${who%%:*} sees the organisation scope" "$(jget d.data.scope)" Organisation
+    assert_true "dashboard: ${who%%:*} total covers at least the employee's requests" "$(jget "d.data.total >= $EMP_TOTAL")"
+    assert_true "dashboard: ${who%%:*} cancelled covers at least the employee's" "$(jget "d.data.cancelled >= $EMP_CANCELLED")"
+  done
+  for who in "Manager:$T_MGR" "HR:$T_HR" "Store:$T_STORE" "Security:$T_SEC"; do
+    call GET /api/dashboard/summary "${who#*:}"
+    assert_eq "dashboard: ${who%%:*} sees their own scope" "$(jget d.data.scope)" Mine
+  done
+
   # --------------------------------------------------- authentication
   for route in "GET /api/modules" "GET /api/modules/stationery" "POST /api/requests" "GET /api/requests/$R1" \
     "POST /api/requests/$R1/actions" "GET /api/requests/$R1/audit" "GET /api/requests/mine" "GET /api/requests/inbox" \
@@ -697,8 +729,9 @@ no_employee_mode() {
   assert_eq "no-employee: mine is empty" "$(jget 'd.data.items.length + ":" + d.data.total')" "0:0"
   call GET /api/dashboard/summary "$tok"
   assert_status "no-employee: summary answers 200" 200
-  assert_eq "no-employee: counters are zero and recent is empty" \
-    "$(jget '[d.data.total, d.data.pending, d.data.approved, d.data.rejected, d.data.completed, d.data.recent.length].join(",")')" "0,0,0,0,0,0"
+  assert_eq "no-employee: the administrator sees the organisation scope" "$(jget d.data.scope)" Organisation
+  assert_eq "no-employee: counters are zero on a fresh database and recent is empty" \
+    "$(jget '[d.data.total, d.data.pending, d.data.approved, d.data.rejected, d.data.completed, d.data.cancelled, d.data.recent.length].join(",")')" "0,0,0,0,0,0,0"
   call GET /api/requests/inbox "$tok"
   assert_status "no-employee: inbox answers 200" 200
   call GET /api/requests/inbox/count "$tok"

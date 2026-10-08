@@ -6,6 +6,7 @@ import { Skeleton } from 'primeng/skeleton';
 import { DashboardSummary } from '../../core/api/models';
 import { RequestsApi } from '../../core/api/requests.api';
 import { ROUTE_PATHS } from '../../core/constants/routes';
+import { REQUEST_STATUSES } from '../../core/constants/statuses';
 import { EmptyStateComponent } from '../../shared/empty-state/empty-state.component';
 import { relativeTime } from '../../shared/formatters/dates';
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.component';
@@ -13,11 +14,12 @@ import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.com
 interface Counter {
   label: string;
   value: number;
-  link: string;
+  /** Null for a plain (non-linking) card. */
+  link: string | null;
   query: Record<string, string> | null;
 }
 
-/** The same six counters and the five most recent items for every role. */
+/** The same seven counters and the five most recent items for every role. */
 @Component({
   selector: 'app-dashboard-page',
   imports: [RouterLink, ButtonDirective, Skeleton, EmptyStateComponent, StatusBadgeComponent],
@@ -28,7 +30,7 @@ interface Counter {
     }
     .counters {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: var(--space-md);
       margin-bottom: var(--space-xl, 32px);
     }
@@ -54,10 +56,10 @@ interface Counter {
       color: var(--p-text-color);
       min-height: 92px;
     }
-    .counter:hover {
+    a.counter:hover {
       border-color: var(--p-primary-color);
     }
-    .counter:focus-visible {
+    a.counter:focus-visible {
       outline: 2px solid var(--p-primary-color);
       outline-offset: 2px;
     }
@@ -71,6 +73,9 @@ interface Counter {
       color: var(--p-text-muted-color);
     }
     h2 {
+      margin: 0 0 var(--space-sm);
+    }
+    .scope {
       margin: 0 0 var(--space-sm);
     }
     .card {
@@ -124,12 +129,20 @@ interface Counter {
         <button pButton type="button" severity="secondary" [text]="true" (click)="load()">Try again</button>
       </div>
     } @else if (summary(); as data) {
+      <h2 class="text-heading scope">{{ data.scope === 'Organisation' ? 'All requests' : 'My requests' }}</h2>
       <div class="counters">
         @for (c of counters(data); track c.label) {
-          <a class="counter" [routerLink]="c.link" [queryParams]="c.query">
-            <span class="number">{{ c.value }}</span>
-            <span class="caption">{{ c.label }}</span>
-          </a>
+          @if (c.link) {
+            <a class="counter" [routerLink]="c.link" [queryParams]="c.query">
+              <span class="number">{{ c.value }}</span>
+              <span class="caption">{{ c.label }}</span>
+            </a>
+          } @else {
+            <div class="counter">
+              <span class="number">{{ c.value }}</span>
+              <span class="caption">{{ c.label }}</span>
+            </div>
+          }
         }
       </div>
 
@@ -170,7 +183,7 @@ export class DashboardPage implements OnInit {
   private readonly router = inject(Router);
 
   protected readonly paths = ROUTE_PATHS;
-  protected readonly skeletons = [1, 2, 3, 4, 5, 6];
+  protected readonly skeletons = [1, 2, 3, 4, 5, 6, 7];
   protected readonly summary = signal<DashboardSummary | null>(null);
   protected readonly failed = signal(false);
 
@@ -187,14 +200,16 @@ export class DashboardPage implements OnInit {
   }
 
   protected counters(data: DashboardSummary): Counter[] {
-    const mine = `/${ROUTE_PATHS.MyRequests}`;
+    // Organisation-wide numbers would not match the My requests list, so those cards do not link.
+    const mine = data.scope === 'Organisation' ? null : `/${ROUTE_PATHS.MyRequests}`;
     return [
       { label: 'Waiting for me', value: data.waitingForMe, link: `/${ROUTE_PATHS.Inbox}`, query: null },
       { label: 'Total', value: data.total, link: mine, query: null },
-      { label: 'Pending', value: data.pending, link: mine, query: { status: 'InProgress', approvalStatus: 'Pending' } },
+      { label: 'Pending', value: data.pending, link: mine, query: { status: REQUEST_STATUSES.InProgress, approvalStatus: 'Pending' } },
       { label: 'Approved', value: data.approved, link: mine, query: { approvalStatus: 'Approved' } },
-      { label: 'Rejected', value: data.rejected, link: mine, query: { status: 'Rejected' } },
-      { label: 'Completed', value: data.completed, link: mine, query: { status: 'Closed' } },
+      { label: 'Rejected', value: data.rejected, link: mine, query: { status: REQUEST_STATUSES.Rejected } },
+      { label: 'Completed', value: data.completed, link: mine, query: { status: REQUEST_STATUSES.Closed } },
+      { label: 'Cancelled', value: data.cancelled, link: mine, query: { status: REQUEST_STATUSES.Cancelled } },
     ];
   }
 

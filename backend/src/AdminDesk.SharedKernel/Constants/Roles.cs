@@ -18,6 +18,9 @@ public static class Roles
         Employee, Manager, Admin, Finance, Management, HR, IT, Security, Store, SystemAdmin
     };
 
+    // Roles whose dashboard counters cover every request, not just their own.
+    public static readonly string[] OrganisationWide = { Admin, SystemAdmin, Management };
+
     // Manager is derived from the reporting line, so it is never assigned directly.
     public static readonly string[] Assignable =
     {

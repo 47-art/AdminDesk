@@ -245,15 +245,16 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
 
     // ---------------------------------------------------------------- summary
 
-    public async Task<SummaryCounts> SummaryAsync(long employeeId, CancellationToken ct)
+    public async Task<SummaryCounts> SummaryAsync(long? employeeId, CancellationToken ct)
     {
         const string sql =
             "SELECT COUNT(*) AS Total, " +
             "COALESCE(SUM(CASE WHEN r.current_status = 'InProgress' AND r.approval_status = 'Pending' THEN 1 ELSE 0 END), 0) AS Pending, " +
             "COALESCE(SUM(CASE WHEN r.approval_status = 'Approved' THEN 1 ELSE 0 END), 0) AS Approved, " +
             "COALESCE(SUM(CASE WHEN r.current_status = 'Rejected' THEN 1 ELSE 0 END), 0) AS Rejected, " +
-            "COALESCE(SUM(CASE WHEN r.current_status = 'Closed' THEN 1 ELSE 0 END), 0) AS Completed " +
-            "FROM requests r WHERE r.requester_employee_id = @Employee AND ";
+            "COALESCE(SUM(CASE WHEN r.current_status = 'Closed' THEN 1 ELSE 0 END), 0) AS Completed, " +
+            "COALESCE(SUM(CASE WHEN r.current_status = 'Cancelled' THEN 1 ELSE 0 END), 0) AS Cancelled " +
+            "FROM requests r WHERE (@Employee IS NULL OR r.requester_employee_id = @Employee) AND ";
 
         await using var connection = await _factory.OpenAsync(ct);
         return await connection.QuerySingleAsync<SummaryCounts>(new CommandDefinition(

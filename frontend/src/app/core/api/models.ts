@@ -252,6 +252,8 @@ export interface RequestListItem {
   captureFields: FieldDto[];
 }
 
+export type DashboardScope = 'Organisation' | 'Mine';
+
 export interface DashboardSummary {
   waitingForMe: number;
   total: number;
@@ -259,6 +261,8 @@ export interface DashboardSummary {
   approved: number;
   rejected: number;
   completed: number;
+  cancelled: number;
+  scope: DashboardScope;
   recent: RequestListItem[];
 }
 

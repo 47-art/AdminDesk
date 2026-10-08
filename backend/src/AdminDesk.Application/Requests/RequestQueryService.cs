@@ -225,22 +225,27 @@ public sealed class RequestQueryService : IRequestQueryService
     public async Task<DashboardSummary> SummaryAsync(ActorContext actor, CancellationToken ct)
     {
         var waiting = await _repository.CountInboxAsync(actor.EmployeeId, actor.Roles, ct);
+        var orgWide = actor.Roles.Any(Roles.OrganisationWide.Contains);
+        var scope = orgWide ? DashboardScopes.Organisation : DashboardScopes.Mine;
         if (actor.EmployeeId is not { } employeeId)
         {
-            return new DashboardSummary(waiting, 0, 0, 0, 0, 0, Array.Empty<RequestListItem>());
+            if (!orgWide)
+            {
+                return new DashboardSummary(waiting, 0, 0, 0, 0, 0, 0, scope, Array.Empty<RequestListItem>());
+            }
+
+            var all = await _repository.SummaryAsync(null, ct);
+            return ToSummary(waiting, all, scope, Array.Empty<RequestListItem>());
         }
 
-        var counts = await _repository.SummaryAsync(employeeId, ct);
+        var counts = await _repository.SummaryAsync(orgWide ? null : employeeId, ct);
         var recent = await _repository.ListRecentAsync(employeeId, actor.UserId, RecentCount, ct);
-        return new DashboardSummary(
-            waiting,
-            (int)counts.Total,
-            (int)counts.Pending,
-            (int)counts.Approved,
-            (int)counts.Rejected,
-            (int)counts.Completed,
-            await ToItemsAsync(recent, ct));
+        return ToSummary(waiting, counts, scope, await ToItemsAsync(recent, ct));
     }
+
+    private static DashboardSummary ToSummary(int waiting, SummaryCounts counts, string scope, IReadOnlyList<RequestListItem> recent) =>
+        new(waiting, (int)counts.Total, (int)counts.Pending, (int)counts.Approved, (int)counts.Rejected,
+            (int)counts.Completed, (int)counts.Cancelled, scope, recent);
 
     // Each distinct pinned definition is loaded once for the whole page.
     private async Task<IReadOnlyList<RequestListItem>> ToItemsAsync(IReadOnlyList<RequestListRow> rows, CancellationToken ct)
