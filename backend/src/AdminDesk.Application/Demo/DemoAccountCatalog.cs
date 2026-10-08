@@ -32,6 +32,6 @@ public static class DemoAccountCatalog
         new DemoAccount(Roles.Management, "Vikram Rao", "management@demo.test", "E0001",
             "Sees every request and the audit trail read-only; approves high-value requests as limits are configured."),
         new DemoAccount(Roles.SystemAdmin, "Neha Kulkarni", "sysadmin@demo.test", "E0008",
-            "Technical role: configures workflow definitions, limits and background jobs as those screens arrive, with a read-only view of requests."),
+            "Technical role: configures workflow definitions, limits and background jobs as those screens arrive. Not part of any approval chain."),
     };
 }
