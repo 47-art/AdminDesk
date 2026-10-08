@@ -727,6 +727,20 @@ main_mode() {
     assert_status "visibility: ${who%%:*} opens any request" 200
   done
 
+  # ------------------------------------------- current step shows only while in progress
+  for pair in "mine:$T_EMP" "all:$T_ADM" "team:$T_MGR"; do
+    call GET "/api/requests/${pair%%:*}?pageSize=100" "${pair#*:}"
+    assert_true "current step: ${pair%%:*} rows that are finished carry no step name" \
+      "$(jget 'd.data.items.filter(i => ["Cancelled", "Closed", "Rejected"].includes(i.currentStatus)).every(i => i.currentStepName === null || i.currentStepName === undefined)')"
+    assert_true "current step: ${pair%%:*} rows in progress carry a step name" \
+      "$(jget 'd.data.items.filter(i => i.currentStatus === "InProgress").length > 0 && d.data.items.filter(i => i.currentStatus === "InProgress").every(i => typeof i.currentStepName === "string" && i.currentStepName.length > 0)')"
+    assert_true "current step: ${pair%%:*} has at least one finished row to check" \
+      "$(jget 'd.data.items.some(i => ["Cancelled", "Closed", "Rejected"].includes(i.currentStatus))')"
+  done
+  call GET "/api/requests/inbox?pageSize=100" "$T_ADM"
+  assert_true "current step: inbox rows keep their step name" \
+    "$(jget 'd.data.items.length > 0 && d.data.items.every(i => typeof i.currentStepName === "string" && i.currentStepName.length > 0)')"
+
   # ------------------------------------------- list query checks on all and team
   for pair in "all:$T_ADM" "team:$T_MGR"; do
     lp="/api/requests/${pair%%:*}"; lt=${pair#*:}

@@ -313,7 +313,7 @@ public sealed class RequestQueryService : IRequestQueryService
                 row.RequiredDate,
                 Enum.Parse<Priority>(row.Priority),
                 status,
-                row.CurrentStepName,
+                inProgress ? row.CurrentStepName : null,
                 step?.Type,
                 row.ResponsibleName,
                 row.ResponsibleRole,

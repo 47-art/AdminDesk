@@ -117,7 +117,7 @@ The process description leaves some things open. What was chosen:
 
 1. The workflow model is deliberately small: two step kinds, approval and task; four request statuses (In progress, Closed, Rejected and Cancelled); three approval statuses (Pending, Approved and Rejected). While a request is in progress, the name of the current step is the status shown. There is no draft, no editing after creating and no comment thread. Reject and Cancel, both with a reason, are not described in the process description and were added as the smallest possible rule set.
 2. Cancel is allowed while the request is in progress, by the requester, and always with a reason, until the step that hands over the item is done (Issue material for stationery, Dispatch for courier); after that Cancel is no longer offered and the server refuses it. The lock is read from the definition version the request was created with, so a request raised before that version keeps the old rule.
-3. Visibility: a request can be opened by its requester, by anyone who has acted on it or is asked to act on it, and by Admin and System admin.
+3. Visibility: a request can be opened by the person who raised it, by anyone who has acted on it or is asked to act on it, by the manager of the person who raised it (read-only, apart from their own step actions) and by Admin and System admin. Everyone else gets "not found". Cancel is only for the requester. The dashboard counters show the signed-in person's own requests, except for Admin and System admin, who see the whole organisation. Those two also get an All requests page, and managers get a Team requests page with the requests of their direct reports.
 4. Role changes apply at the next sign-in.
 5. A step's actors may be a list of roles; anyone holding one of them can act.
 6. The courier delivery confirmation is done by the requester, because the process description does not say who confirms delivery.
@@ -128,7 +128,7 @@ The process description leaves some things open. What was chosen:
 11. A step that nobody can act on, for example a reporting-manager approval for someone who has no manager, simply waits; nothing is skipped automatically. The person who raised it can cancel it with a reason. A request raised by the Management demo user waits at its first step for exactly this reason: that user's reporting manager is the top of the hierarchy (employee E0011), who has no login and no demo account.
 12. The Audit trail section on the request page is visible to Admin and System admin only.
 13. Approval limits are held in the database (the shipped modules declare none) and can be edited there until the limits editor exists.
-14. The Management role exists, but no shipped module routes to Management yet: approval by Management arrives with the modules whose approval rules need it, so a Management login sees an empty Waiting for me list.
+14. The Management role exists, but no shipped module routes to Management yet: approval by Management arrives with the modules whose approval rules need it, so a Management login sees an empty Waiting for me list. Management has no whole-operation view in this release: its dashboard shows its own requests.
 
 ## Not yet built
 

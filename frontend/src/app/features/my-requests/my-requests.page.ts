@@ -467,7 +467,11 @@ const SOURCES: Record<ListSource, SourceConfig> = {
               <td>{{ row.priority }}</td>
               <td><app-status-badge [status]="row.currentStatus" /></td>
               <td>
-                {{ row.currentStepName }}
+                @if (row.currentStepName) {
+                  {{ row.currentStepName }}
+                } @else {
+                  <span aria-label="No current step">&mdash;</span>
+                }
                 @if (row.currentStatus === 'InProgress' && (row.responsibleName || row.responsibleRole)) {
                   <div class="secondary">Waiting on {{ row.responsibleName ?? row.responsibleRole }}</div>
                 }
