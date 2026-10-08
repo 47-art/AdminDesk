@@ -235,6 +235,11 @@ public sealed class DefinitionPayloadValidator
                     errors.Add(Error(field.Key, "Enter an amount with at most two decimal places."));
                     return null;
                 }
+                if (!MoneyConverter.IsWithinLimit(rupees))
+                {
+                    errors.Add(Error(field.Key, MoneyConverter.TooLargeMessage));
+                    return null;
+                }
                 if (!CheckRange(field, rupees, errors))
                 {
                     return null;
@@ -245,7 +250,7 @@ public sealed class DefinitionPayloadValidator
                 }
                 catch (OverflowException)
                 {
-                    errors.Add(Error(field.Key, "Enter a smaller amount."));
+                    errors.Add(Error(field.Key, MoneyConverter.TooLargeMessage));
                     return null;
                 }
             }

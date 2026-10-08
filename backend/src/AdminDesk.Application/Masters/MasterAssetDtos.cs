@@ -1,3 +1,4 @@
+using AdminDesk.SharedKernel.Money;
 using FluentValidation;
 
 namespace AdminDesk.Application.Masters;
@@ -109,6 +110,7 @@ public sealed class SimFieldsBodyValidator : AbstractValidator<SimFieldsBody>
         RuleFor(x => x.Plan).NotEmpty().WithMessage("Enter the plan.").MaximumLength(80);
         RuleFor(x => x.MonthlyCost).NotNull().WithMessage("Enter the monthly cost.")
             .GreaterThanOrEqualTo(0).WithMessage("The monthly cost cannot be negative.")
+            .LessThanOrEqualTo(MoneyConverter.MaxRupees).WithMessage(MoneyConverter.TooLargeMessage)
             .Must(v => v is null || decimal.Round(v.Value, 2) == v.Value).WithMessage("Enter an amount with at most two decimal places.");
     }
 }

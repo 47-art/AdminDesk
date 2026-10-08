@@ -10,6 +10,7 @@ using AdminDesk.SharedKernel.Actors;
 using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Enums;
 using AdminDesk.SharedKernel.Exceptions;
+using AdminDesk.SharedKernel.Money;
 using AdminDesk.SharedKernel.Responses;
 
 namespace AdminDesk.Application.Definitions;
@@ -100,6 +101,10 @@ public sealed class ModuleConfigService : IModuleConfigService
         if (valueMinor < 0)
         {
             throw new ValidationException("valueMinor", "A limit cannot be negative.");
+        }
+        if (valueMinor > MoneyConverter.MaxMinor)
+        {
+            throw new ValidationException("valueMinor", MoneyConverter.TooLargeMessage);
         }
 
         var issued = await RequireModuleAsync(code, ct);
@@ -426,7 +431,8 @@ public sealed class ModuleConfigService : IModuleConfigService
     {
         var ok = field.Type switch
         {
-            FieldType.Money => value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var rupees) && decimal.Round(rupees, 2) == rupees,
+            FieldType.Money => value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var rupees)
+                && decimal.Round(rupees, 2) == rupees && MoneyConverter.IsWithinLimit(rupees),
             FieldType.Lookup => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
             FieldType.Number => value.ValueKind == JsonValueKind.Number,
             FieldType.YesNo => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
@@ -436,7 +442,7 @@ public sealed class ModuleConfigService : IModuleConfigService
         {
             error("condition.value", field.Type switch
             {
-                FieldType.Money => "Enter an amount in rupees with at most two decimals.",
+                FieldType.Money => "Enter an amount in rupees (up to 1,000,000,000) with at most two decimals.",
                 FieldType.Lookup => "Enter the whole-number id.",
                 FieldType.Number => "Enter a number.",
                 FieldType.YesNo => "Choose yes or no.",

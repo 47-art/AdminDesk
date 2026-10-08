@@ -994,6 +994,8 @@ internal sealed class CoreChecks
             ("quantity", p => p["quantity"] = 0),
             ("quantity", p => p["quantity"] = 11),
             ("amount", p => p["amount"] = 10.123m),
+            ("amount", p => p["amount"] = 100_000_000_000_000_000_000m),
+            ("amount", p => p["amount"] = MoneyConverter.MaxRupees + 0.01m),
             ("needBy", p => p["needBy"] = "2026-02-30"),
             ("startsAt", p => p["startsAt"] = "not a date"),
             ("urgent", p => p["urgent"] = "yes"),

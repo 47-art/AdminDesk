@@ -345,6 +345,10 @@ public sealed class MasterAssetService : IMasterAssetService
         {
             throw new ValidationException("monthlyCost", "Enter an amount of zero or more with at most two decimal places.");
         }
+        if (!MoneyConverter.IsWithinLimit(cost))
+        {
+            throw new ValidationException("monthlyCost", MoneyConverter.TooLargeMessage);
+        }
         return new SimFields(
             Clean(body.SimNumber, "simNumber", "Enter the SIM number."),
             Clean(body.MobileNumber, "mobileNumber", "Enter the mobile number."),

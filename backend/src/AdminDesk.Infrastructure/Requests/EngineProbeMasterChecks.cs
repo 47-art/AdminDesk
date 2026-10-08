@@ -9,6 +9,7 @@ using AdminDesk.Infrastructure.Masters;
 using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Enums;
 using AdminDesk.SharedKernel.Exceptions;
+using AdminDesk.SharedKernel.Money;
 using Dapper;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
@@ -500,6 +501,29 @@ internal sealed class EngineProbeMasterChecks
         var simAdmin = await _service.AddSimAsync(_k.Admin, Sim("PRB-SIM-1", "9100000001"), ct);
         var simManagement = await _service.AddSimAsync(_k.Management, Sim("PRB-SIM-2", "9100000002"), ct);
         _k.Check(simAdmin.Status == SimStatuses.Available && simAdmin.HolderEmployeeId is null && simAdmin.MonthlyCost == 199m, "38: a new SIM does not start Available without a holder");
+
+        // A monthly cost above the maximum is a field error, never a server failure.
+        foreach (var tooMuch in new[] { 100_000_000_000_000_000_000m, MoneyConverter.MaxRupees + 0.01m })
+        {
+            var big = Sim("PRB-SIM-BIG", "9100000099");
+            big.MonthlyCost = tooMuch;
+            var refused = await _k.ExpectAsync<ValidationException>($"38: a SIM monthly cost of {tooMuch}", () => _service.AddSimAsync(_k.Admin, big, ct));
+            _k.Check(refused.FieldErrors.Any(e => e.Field == "monthlyCost"), "38: the oversized monthly cost was not keyed to monthlyCost");
+        }
+        var limit = (await _k.QueryAsync<(string Module, string Step, string Key)>(
+            "SELECT module_code, step_key, limit_key FROM module_limits LIMIT 1")).FirstOrDefault();
+        if (limit.Module is not null)
+        {
+            var config = _k.Services.GetRequiredService<AdminDesk.Application.Definitions.IModuleConfigService>();
+            var oversized = await _k.ExpectAsync<ValidationException>("38: a limit above the maximum",
+                () => config.UpdateLimitAsync(_k.Management, limit.Module, limit.Step, limit.Key, MoneyConverter.MaxMinor + 1, ct));
+            _k.Check(oversized.FieldErrors.Any(e => e.Field == "valueMinor"), "38: the oversized limit was not keyed to valueMinor");
+        }
+        var atMaximum = Sim("PRB-SIM-MAX", "9100000098");
+        atMaximum.MonthlyCost = MoneyConverter.MaxRupees;
+        var maxSim = await _service.AddSimAsync(_k.Admin, atMaximum, ct);
+        _k.Check(maxSim.MonthlyCost == MoneyConverter.MaxRupees, "38: a monthly cost at the maximum was not accepted");
+        await _service.RetireAsync(_k.Admin, MasterTypes.Sim, maxSim.Id, ct);
         foreach (var (name, actor) in new[] { ("IT", _k.It), ("HR", _k.Hr), ("SystemAdmin", _k.SysAdmin), ("Employee", _k.Requester) })
         {
             await _k.ExpectAsync<ForbiddenException>($"38: {name} adding a SIM", () => _service.AddSimAsync(actor, Sim("PRB-SIM-X", "9100000009"), ct));
