@@ -24,8 +24,8 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         new HashSet<RequestStatus> { RequestStatus.InProgress };
 
     private const int ReasonLimit = 1000;
-    private const string RequesterLabel = "Requester";
-    private const string ReportingManagerLabel = "Reporting manager";
+    private const string RequesterLabel = Labels.Requester;
+    private const string ReportingManagerLabel = Labels.ReportingManager;
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly IRequestRepository _requests;

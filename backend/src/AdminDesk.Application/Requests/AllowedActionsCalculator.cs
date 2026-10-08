@@ -65,9 +65,9 @@ public static class AllowedActionsCalculator
         }
         if (stepType == StepType.Approval)
         {
-            return "Approve";
+            return Labels.Approve;
         }
-        return string.IsNullOrWhiteSpace(actionLabel) ? "Complete" : actionLabel;
+        return string.IsNullOrWhiteSpace(actionLabel) ? Labels.Complete : actionLabel;
     }
 
     private static bool Matches(ActorRow row, ActorContext viewer) =>

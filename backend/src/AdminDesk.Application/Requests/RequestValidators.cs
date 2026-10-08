@@ -1,3 +1,4 @@
+using AdminDesk.SharedKernel.Constants;
 using AdminDesk.SharedKernel.Enums;
 using FluentValidation;
 
@@ -69,7 +70,7 @@ public sealed class MineQueryValidator : AbstractValidator<MineQuery>
         RuleFor(x => x.Q).MaximumLength(100);
         RuleFor(x => x.Module).MaximumLength(60);
         RuleFor(x => x.Dir)
-            .Must(d => string.IsNullOrEmpty(d) || d.Equals("asc", StringComparison.OrdinalIgnoreCase) || d.Equals("desc", StringComparison.OrdinalIgnoreCase))
+            .Must(d => string.IsNullOrEmpty(d) || d.Equals(SortDirections.Ascending, StringComparison.OrdinalIgnoreCase) || d.Equals(SortDirections.Descending, StringComparison.OrdinalIgnoreCase))
             .WithMessage("Direction must be asc or desc.");
         RuleForEach(x => x.Status)
             .Must(s => RequestParsing.ParseEnum<RequestStatus>(s) is not null)

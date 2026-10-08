@@ -3,6 +3,8 @@ using AdminDesk.Application.Abstractions.Persistence;
 using AdminDesk.Application.Engine;
 using AdminDesk.Application.Requests;
 using AdminDesk.Infrastructure.Persistence;
+using AdminDesk.SharedKernel.Constants;
+using AdminDesk.SharedKernel.Enums;
 using Dapper;
 
 namespace AdminDesk.Infrastructure.Requests;
@@ -14,9 +16,14 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
 {
     private const string DateFormat = "yyyy-MM-dd";
 
-    private const string StatusOrder =
-        "CASE r.current_status WHEN 'InProgress' THEN 0 WHEN 'Closed' THEN 1 WHEN 'Rejected' THEN 2 " +
-        "WHEN 'Cancelled' THEN 3 ELSE 4 END";
+    // Status and approval values as SQL literals, taken from the enums so the names live in one place.
+    private static string Lit<T>(T value) where T : Enum => "'" + value + "'";
+
+    private static readonly string InProgress = Lit(RequestStatus.InProgress);
+
+    private static readonly string StatusOrder =
+        "CASE r.current_status WHEN " + InProgress + " THEN 0 WHEN " + Lit(RequestStatus.Closed) + " THEN 1 WHEN " +
+        Lit(RequestStatus.Rejected) + " THEN 2 WHEN " + Lit(RequestStatus.Cancelled) + " THEN 3 ELSE 4 END";
 
     // Sort keys the client may use, mapped to the column or expression behind them.
     private static readonly IReadOnlyDictionary<string, string> SortColumns =
@@ -76,10 +83,11 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
         "SELECT a.id, a.request_id, a.step_seq, a.role_name, a.employee_id FROM request_step_actors a " +
         "WHERE a.request_id = @Id AND a.is_active = 1 ORDER BY a.step_seq, a.id";
 
-    private const string StopSql =
+    private static readonly string StopSql =
         "SELECT e.event_type AS EventType, e.comment AS Comment, e.actor_name AS ActorName, e.actor_role AS ActorRole, " +
         "e.created_utc AS CreatedUtc FROM audit_events e " +
-        "WHERE e.request_id = @Id AND e.event_type IN ('Cancelled', 'Rejected') ORDER BY e.id DESC LIMIT 1";
+        "WHERE e.request_id = @Id AND e.event_type IN ('" + AuditEventTypes.Cancelled + "', '" + AuditEventTypes.Rejected +
+        "') ORDER BY e.id DESC LIMIT 1";
 
     private readonly IDbConnectionFactory _factory;
     private readonly ISqlDialect _dialect;
@@ -182,7 +190,7 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
         var column = sort is not null && SortColumns.TryGetValue(sort.Trim(), out var known)
             ? known
             : SortColumns[DefaultSortKey];
-        var direction = string.Equals(dir?.Trim(), "asc", StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
+        var direction = string.Equals(dir?.Trim(), SortDirections.Ascending, StringComparison.OrdinalIgnoreCase) ? "ASC" : "DESC";
         return column + " " + direction + ", r.id " + direction;
     }
 
@@ -192,7 +200,7 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
         long? employeeId, IReadOnlyCollection<string> roles, InboxFilter filter, CancellationToken ct)
     {
         var parameters = new DynamicParameters();
-        var where = new List<string> { AuditSql.Active("r"), "r.current_status = 'InProgress'" };
+        var where = new List<string> { AuditSql.Active("r"), "r.current_status = " + InProgress };
         if (!AddActorClause(where, parameters, employeeId, roles))
         {
             return new PagedRows<RequestListRow>(Array.Empty<RequestListRow>(), 0);
@@ -221,7 +229,7 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
     public async Task<int> CountInboxAsync(long? employeeId, IReadOnlyCollection<string> roles, CancellationToken ct)
     {
         var parameters = new DynamicParameters();
-        var where = new List<string> { AuditSql.Active("r"), "r.current_status = 'InProgress'" };
+        var where = new List<string> { AuditSql.Active("r"), "r.current_status = " + InProgress };
         if (!AddActorClause(where, parameters, employeeId, roles))
         {
             return 0;
@@ -263,13 +271,13 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
 
     public async Task<SummaryCounts> SummaryAsync(long? employeeId, CancellationToken ct)
     {
-        const string sql =
+        var sql =
             "SELECT COUNT(*) AS Total, " +
-            "COALESCE(SUM(CASE WHEN r.current_status = 'InProgress' AND r.approval_status = 'Pending' THEN 1 ELSE 0 END), 0) AS Pending, " +
-            "COALESCE(SUM(CASE WHEN r.approval_status = 'Approved' THEN 1 ELSE 0 END), 0) AS Approved, " +
-            "COALESCE(SUM(CASE WHEN r.current_status = 'Rejected' THEN 1 ELSE 0 END), 0) AS Rejected, " +
-            "COALESCE(SUM(CASE WHEN r.current_status = 'Closed' THEN 1 ELSE 0 END), 0) AS Completed, " +
-            "COALESCE(SUM(CASE WHEN r.current_status = 'Cancelled' THEN 1 ELSE 0 END), 0) AS Cancelled " +
+            "COALESCE(SUM(CASE WHEN r.current_status = " + InProgress + " AND r.approval_status = " + Lit(ApprovalStatus.Pending) + " THEN 1 ELSE 0 END), 0) AS Pending, " +
+            "COALESCE(SUM(CASE WHEN r.approval_status = " + Lit(ApprovalStatus.Approved) + " THEN 1 ELSE 0 END), 0) AS Approved, " +
+            "COALESCE(SUM(CASE WHEN r.current_status = " + Lit(RequestStatus.Rejected) + " THEN 1 ELSE 0 END), 0) AS Rejected, " +
+            "COALESCE(SUM(CASE WHEN r.current_status = " + Lit(RequestStatus.Closed) + " THEN 1 ELSE 0 END), 0) AS Completed, " +
+            "COALESCE(SUM(CASE WHEN r.current_status = " + Lit(RequestStatus.Cancelled) + " THEN 1 ELSE 0 END), 0) AS Cancelled " +
             "FROM requests r WHERE (@Employee IS NULL OR r.requester_employee_id = @Employee) AND ";
 
         await using var connection = await _factory.OpenAsync(ct);

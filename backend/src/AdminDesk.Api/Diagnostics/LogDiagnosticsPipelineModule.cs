@@ -24,9 +24,9 @@ public sealed class LogDiagnosticsPipelineModule : IPipelineModule
             var logger = loggers.CreateLogger("AdminDesk.Api.Diagnostics.LogTest");
             switch (mode)
             {
-                case "error":
+                case LogTestModes.Error:
                     throw new InvalidOperationException("Forced diagnostic error");
-                case "warning":
+                case LogTestModes.Warning:
                     logger.LogWarning("Forced diagnostic warning");
                     break;
                 default:
