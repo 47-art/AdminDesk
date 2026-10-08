@@ -54,8 +54,9 @@ public sealed class DefinitionRepository : IDefinitionRepository
     public async Task<DefinitionRow?> GetByIdAsync(long id, CancellationToken ct)
     {
         await using var connection = await _factory.OpenAsync(ct);
-        return await connection.QueryFirstOrDefaultAsync<DefinitionRow>(new CommandDefinition(
+        var stored = await connection.QueryFirstOrDefaultAsync<StoredRow>(new CommandDefinition(
             "SELECT " + Columns + " FROM module_definitions d WHERE d.id = @Id", new { Id = id }, cancellationToken: ct));
+        return stored?.ToRow();
     }
 
     public async Task<IReadOnlyList<DefinitionRow>> ListLatestAsync(CancellationToken ct)
@@ -67,7 +68,9 @@ public sealed class DefinitionRepository : IDefinitionRepository
             " AND d.version = (SELECT MAX(x.version) FROM module_definitions x WHERE x.code = d.code AND " + inner + ") " +
             "ORDER BY d.code";
         await using var connection = await _factory.OpenAsync(ct);
-        return (await connection.QueryAsync<DefinitionRow>(new CommandDefinition(sql, cancellationToken: ct))).ToList();
+        return (await connection.QueryAsync<StoredRow>(new CommandDefinition(sql, cancellationToken: ct)))
+            .Select(row => row.ToRow())
+            .ToList();
     }
 
     public async Task<string?> GetHashAsync(string code, int version, CancellationToken ct)
@@ -76,5 +79,21 @@ public sealed class DefinitionRepository : IDefinitionRepository
         return await connection.ExecuteScalarAsync<string?>(new CommandDefinition(
             "SELECT content_hash FROM module_definitions WHERE code = @Code AND version = @Version",
             new { Code = code, Version = version }, cancellationToken: ct));
+    }
+
+    // The database hands back 64-bit integers, so rows are read into settable properties first.
+    private sealed class StoredRow
+    {
+        public long Id { get; set; }
+        public string Code { get; set; } = string.Empty;
+        public long Version { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? Category { get; set; }
+        public string Prefix { get; set; } = string.Empty;
+        public string DefinitionJson { get; set; } = string.Empty;
+        public string ContentHash { get; set; } = string.Empty;
+
+        public DefinitionRow ToRow() =>
+            new(Id, Code, checked((int)Version), Name, Category, Prefix, DefinitionJson, ContentHash);
     }
 }

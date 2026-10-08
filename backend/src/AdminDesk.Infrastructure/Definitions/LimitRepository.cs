@@ -48,7 +48,9 @@ public sealed class LimitRepository : ILimitRepository
             "SELECT " + Columns + " FROM module_limits l WHERE l.module_code = @ModuleCode AND " + AuditSql.Active("l") +
             " ORDER BY l.step_key, l.limit_key";
         await using var connection = await _factory.OpenAsync(ct);
-        return (await connection.QueryAsync<LimitRow>(new CommandDefinition(sql, new { ModuleCode = moduleCode }, cancellationToken: ct))).ToList();
+        return (await connection.QueryAsync<StoredLimit>(new CommandDefinition(sql, new { ModuleCode = moduleCode }, cancellationToken: ct)))
+            .Select(row => row.ToRow())
+            .ToList();
     }
 
     public async Task<IReadOnlyList<LimitRow>> ListAllAsync(CancellationToken ct)
@@ -57,6 +59,21 @@ public sealed class LimitRepository : ILimitRepository
             "SELECT " + Columns + " FROM module_limits l WHERE " + AuditSql.Active("l") +
             " ORDER BY l.module_code, l.step_key, l.limit_key";
         await using var connection = await _factory.OpenAsync(ct);
-        return (await connection.QueryAsync<LimitRow>(new CommandDefinition(sql, cancellationToken: ct))).ToList();
+        return (await connection.QueryAsync<StoredLimit>(new CommandDefinition(sql, cancellationToken: ct)))
+            .Select(row => row.ToRow())
+            .ToList();
+    }
+
+    // The database hands back 64-bit integers, so rows are read into settable properties first.
+    private sealed class StoredLimit
+    {
+        public string ModuleCode { get; set; } = string.Empty;
+        public string StepKey { get; set; } = string.Empty;
+        public string LimitKey { get; set; } = string.Empty;
+        public long ValueMinor { get; set; }
+        public string? Unit { get; set; }
+        public long IsSample { get; set; }
+
+        public LimitRow ToRow() => new(ModuleCode, StepKey, LimitKey, ValueMinor, Unit, IsSample != 0);
     }
 }
