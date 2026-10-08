@@ -16,7 +16,9 @@ namespace AdminDesk.Application.Engine;
 // everything else as string. Empty optional values are left out.
 public sealed class DefinitionPayloadValidator
 {
+    private const int DefaultTextLimit = 200;
     private const int DefaultLongTextLimit = 4000;
+    private const int MaxSuppliedKeys = 100;
     public const int RemarksLimit = 1000;
 
     private readonly ILookupRegistry _lookups;
@@ -96,6 +98,12 @@ public sealed class DefinitionPayloadValidator
         var values = new Dictionary<string, object?>();
         var input = supplied ?? new Dictionary<string, JsonElement>();
 
+        if (input.Count > MaxSuppliedKeys)
+        {
+            errors.Add(Error("payload", "Too many values were sent."));
+            return values;
+        }
+
         foreach (var key in input.Keys)
         {
             if (fields.All(f => f.Key != key))
@@ -150,7 +158,7 @@ public sealed class DefinitionPayloadValidator
                     return null;
                 }
                 var text = raw.GetString()!.Trim();
-                var limit = field.MaxLength ?? (field.Type == FieldType.LongText ? DefaultLongTextLimit : (int?)null);
+                var limit = field.MaxLength ?? (field.Type == FieldType.LongText ? DefaultLongTextLimit : DefaultTextLimit);
                 if (limit is { } max && text.Length > max)
                 {
                     errors.Add(Error(field.Key, $"Keep {Lower(field.Label)} to {max} characters or fewer."));

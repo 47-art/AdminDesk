@@ -10,6 +10,10 @@ public sealed class CreateRequestBodyValidator : AbstractValidator<CreateRequest
         RuleFor(x => x.ModuleCode).NotEmpty().WithMessage("Choose a module.").MaximumLength(60);
         RuleFor(x => x.DefinitionId).GreaterThan(0).WithMessage("This form is out of date. Reload the page and try again.");
         RuleFor(x => x.Payload).NotNull().WithMessage("Fill in the form.");
+        RuleFor(x => x.Payload!)
+            .Must(p => p.Count <= 100).WithMessage("Too many values were sent.")
+            .When(x => x.Payload is not null)
+            .OverridePropertyName("payload");
 
         // Reported under the same names the engine uses for the common fields.
         When(x => x.Common is not null, () =>

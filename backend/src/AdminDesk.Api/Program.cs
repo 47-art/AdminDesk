@@ -68,6 +68,9 @@ builder.Host.UseSerilog((context, services, loggerConfiguration) =>
     }
 });
 
+// Request bodies here are small JSON documents; nothing legitimate comes close to this.
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 1_048_576);
+
 var jsonNaming = JsonNamingPolicy.CamelCase;
 
 builder.Services
