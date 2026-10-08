@@ -1,6 +1,6 @@
 {
   "code": "housekeeping",
-  "version": 1,
+  "version": 2,
   "name": "Housekeeping request",
   "description": "Raise a housekeeping request or complaint for a location. Admin assigns it, housekeeping acts, Admin records completion and you confirm.",
   "category": "Facilities",
@@ -8,8 +8,7 @@
   "prefix": "HKP",
   "subject": "Housekeeping: {category}",
   "fields": [
-    { "key": "location", "label": "Location", "type": "lookup", "lookupKind": "location", "required": true, "section": "Location" },
-    { "key": "area", "label": "Floor or area", "type": "text", "maxLength": 100, "section": "Location" },
+    { "key": "area", "label": "Floor or area", "type": "text", "maxLength": 100, "section": "Where" },
     {
       "key": "category", "label": "Issue category", "type": "select", "required": true, "section": "Issue",
       "options": [
@@ -34,5 +33,6 @@
     { "key": "completion", "name": "Completion", "type": "task", "actor": { "roles": ["Admin"] }, "actionLabel": "Mark as completed" },
     { "key": "employee-confirmation", "name": "Employee confirmation", "type": "task", "actor": { "requester": true }, "actionLabel": "Confirm" }
   ],
+  "requiredCommonFields": ["location"],
   "limits": []
 }

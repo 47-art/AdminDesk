@@ -37,7 +37,7 @@ public sealed class DefinitionPayloadValidator
         CancellationToken ct)
     {
         var errors = new List<FieldError>();
-        await CheckCommonAsync(common, requestDate, errors, ct);
+        await CheckCommonAsync(definition, common, requestDate, errors, ct);
         var values = await CheckFieldsAsync(definition.Fields, payload, errors, ct);
         if (errors.Count > 0)
         {
@@ -62,7 +62,7 @@ public sealed class DefinitionPayloadValidator
         return values;
     }
 
-    private async Task CheckCommonAsync(CommonFields common, DateOnly requestDate, List<FieldError> errors, CancellationToken ct)
+    private async Task CheckCommonAsync(ModuleDefinition definition, CommonFields common, DateOnly requestDate, List<FieldError> errors, CancellationToken ct)
     {
         if (!Enum.IsDefined(common.Priority))
         {
@@ -75,6 +75,19 @@ public sealed class DefinitionPayloadValidator
         if (common.Remarks is { } remarks && remarks.Length > RemarksLimit)
         {
             errors.Add(Error("remarks", $"Keep the remarks to {RemarksLimit} characters or fewer."));
+        }
+        var mandatory = definition.RequiredCommonFields ?? Array.Empty<CommonFieldKey>();
+        if (common.ProjectId is null && mandatory.Contains(CommonFieldKey.Project))
+        {
+            errors.Add(Error("projectId", "Select a project."));
+        }
+        if (common.LocationId is null && mandatory.Contains(CommonFieldKey.Location))
+        {
+            errors.Add(Error("locationId", "Select a location."));
+        }
+        if (common.CostCentreId is null && mandatory.Contains(CommonFieldKey.CostCentre))
+        {
+            errors.Add(Error("costCentreId", "Select a cost centre."));
         }
         await CheckCommonLookupAsync("projectId", "project", common.ProjectId, errors, ct);
         await CheckCommonLookupAsync("locationId", "location", common.LocationId, errors, ct);

@@ -77,6 +77,12 @@ public static class DefinitionValidator
             problems.Add($"{Where()}: category '{def.Category}' is not one of: {string.Join(", ", Categories.All)}");
         }
 
+        var requiredCommon = def.RequiredCommonFields ?? Array.Empty<CommonFieldKey>();
+        if (requiredCommon.Distinct().Count() != requiredCommon.Count)
+        {
+            problems.Add($"{Where()}: requiredCommonFields lists the same field more than once");
+        }
+
         var fields = def.Fields ?? Array.Empty<FieldDefinition>();
         var steps = def.Steps ?? Array.Empty<StepDefinition>();
         var limits = def.Limits ?? Array.Empty<LimitDefinition>();

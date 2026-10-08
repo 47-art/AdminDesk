@@ -476,10 +476,24 @@ internal sealed class EngineProbeModuleChecks
         _k.Check(captured.Contains("150000") && captured.Contains("Camp supplies"), $"44: the expense was not recorded ({captured})");
 
         var location = await _k.ScalarAsync<long>("SELECT id FROM locations WHERE is_active = 1 ORDER BY id LIMIT 1");
-        await _k.ExpectFieldAsync("44: housekeeping without a location", "location",
+        var houseDefinition = await _k.Definitions.GetActiveAsync("housekeeping");
+        _k.Check(houseDefinition is not null && houseDefinition.Definition.Version == 2
+            && houseDefinition.Definition.Fields!.All(f => f.Key != "location")
+            && houseDefinition.Definition.RequiredCommonFields is { Count: 1 } req && req[0] == CommonFieldKey.Location,
+            "44: the housekeeping definition is not version 2 requiring only the common location");
+        _k.Check(AdminDesk.Application.Definitions.ModuleCatalogService.ToDto(houseDefinition!).RequiredCommonFields.SequenceEqual(new[] { "location" }),
+            "44: the housekeeping module does not report the location as required");
+        var ex = await _k.ExpectAsync<ValidationException>("44: housekeeping without a location",
             () => _k.CreateAsync(_k.Requester, "housekeeping", new { category = "Pantry", description = "Tea station is dirty" }));
+        _k.Check(ex.FieldErrors.Any(e => e.Field == "locationId" && e.Message == "Select a location."),
+            "44: housekeeping without a location did not get the location field error");
+        await _k.ExpectFieldAsync("44: housekeeping with an unknown location", "locationId",
+            () => _k.CreateAsync(_k.Requester, "housekeeping", new { category = "Pantry", description = "x" }, new CommonFields { LocationId = 999999 }));
+        var plain = await _k.CreateAsync(_k.Requester, "stationery", new { item = "Notebook", quantity = 2 });
+        await _k.ActAsync(_k.Requester, plain, RequestAction.Cancel, "Probe check finished");
         var house = await _k.CreateAsync(_k.Requester, "housekeeping",
-            new { location, area = "Second floor", category = "Pantry", description = "Tea station is dirty" });
+            new { area = "Second floor", category = "Pantry", description = "Tea station is dirty" },
+            new CommonFields { LocationId = checked((int)location) });
         await AssertStepsAsync(house, "housekeeping");
         _k.Check((await _k.StepsAsync(house)).All(s => s.StepType == "Task"), "44: housekeeping has an approval step");
         await _k.ExpectRefusedAsync("44: the requester assigning the request", _k.Requester, house, () => _k.ActAsync(_k.Requester, house, RequestAction.Complete, null, new() { ["assignedTo"] = J("Vendor") }));
@@ -527,6 +541,13 @@ internal sealed class EngineProbeModuleChecks
             var problems = wrongType.Problems.Concat(AdminDesk.Domain.Definitions.DefinitionValidator.Validate(
                 wrongType.Definitions.Select(d => (d.File, d.Definition)).ToList(), _k.Lookups.Kinds));
             _k.Check(problems.Any(p => p.Contains("defaultFrom")), "45: a defaultFrom on a number field was not rejected");
+
+            File.Delete(Path.Combine(folder, "bad.json"));
+            await File.WriteAllTextAsync(Path.Combine(folder, "bad.json"),
+                BadDefaultDefinition("requesterName", "text").Replace("\"limits\": []", "\"requiredCommonFields\": [\"location\", \"floor\"], \"limits\": []"));
+            var unknownCommon = ReadFrom(folder);
+            _k.Check(unknownCommon.Problems.Any(p => p.Contains("bad.json") && p.Contains("requiredCommonFields") && p.Contains("floor")),
+                "45: an unknown requiredCommonFields value was not rejected when definitions load");
         }
         finally
         {

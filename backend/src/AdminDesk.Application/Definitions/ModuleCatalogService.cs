@@ -110,7 +110,9 @@ public sealed class ModuleCatalogService : IModuleCatalogService
             .ToList();
 
         return new ModuleDefinitionDto(
-            issued.Id, def.Code, def.Version, def.Name, def.Description, def.Category, def.Icon, def.Prefix, sections, steps);
+            issued.Id, def.Code, def.Version, def.Name, def.Description, def.Category, def.Icon, def.Prefix, sections, steps,
+            (def.RequiredCommonFields ?? Array.Empty<AdminDesk.SharedKernel.Enums.CommonFieldKey>())
+                .Select(k => System.Text.Json.JsonNamingPolicy.CamelCase.ConvertName(k.ToString())).ToList());
     }
 
     private static int CategoryOrder(string category)

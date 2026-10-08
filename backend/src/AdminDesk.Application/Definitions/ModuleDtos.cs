@@ -50,4 +50,5 @@ public sealed record ModuleDefinitionDto(
     string? Icon,
     string Prefix,
     IReadOnlyList<SectionDto> Sections,
-    IReadOnlyList<StepSummaryDto> Steps);
+    IReadOnlyList<StepSummaryDto> Steps,
+    IReadOnlyList<string> RequiredCommonFields);

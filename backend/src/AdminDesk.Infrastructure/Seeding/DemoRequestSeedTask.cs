@@ -231,11 +231,10 @@ public sealed class DemoRequestSeedTask : IStartupTask
         {
             await RunAsync("housekeeping", priya, new()
             {
-                ["location"] = JsonSerializer.SerializeToElement(location.Value),
                 ["area"] = JsonSerializer.SerializeToElement("Second floor"),
                 ["category"] = JsonSerializer.SerializeToElement("Washroom"),
                 ["description"] = JsonSerializer.SerializeToElement("Supplies in the washroom need refilling")
-            }, ago(0, 5), Array.Empty<Move>(), ct);
+            }, ago(0, 5), Array.Empty<Move>(), ct, checked((int)location.Value));
         }
     }
 
@@ -264,7 +263,7 @@ public sealed class DemoRequestSeedTask : IStartupTask
 
     // Creates the request at the start instant and plays each move a few hours later than the one before.
     private async Task RunAsync(string moduleCode, ActorContext requester, Dictionary<string, JsonElement> payload,
-        DateTimeOffset start, IEnumerable<Move> moves, CancellationToken ct)
+        DateTimeOffset start, IEnumerable<Move> moves, CancellationToken ct, int? locationId = null)
     {
         var definition = await _definitions.GetActiveAsync(moduleCode)
             ?? throw new InvalidOperationException($"Definition {moduleCode} is not active.");
@@ -275,6 +274,7 @@ public sealed class DemoRequestSeedTask : IStartupTask
         {
             ModuleCode = moduleCode,
             DefinitionId = checked((int)definition.Id),
+            Common = new CommonFields { LocationId = locationId },
             Payload = payload
         }, ct);
 

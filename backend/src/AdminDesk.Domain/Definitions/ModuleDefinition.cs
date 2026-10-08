@@ -24,6 +24,9 @@ public sealed record ModuleDefinition
     public IReadOnlyList<FieldDefinition> Fields { get; init; } = Array.Empty<FieldDefinition>();
     public IReadOnlyList<StepDefinition> Steps { get; init; } = Array.Empty<StepDefinition>();
     public IReadOnlyList<LimitDefinition> Limits { get; init; } = Array.Empty<LimitDefinition>();
+
+    // Common request fields (location, project, cost centre) that must be filled in for this module.
+    public IReadOnlyList<CommonFieldKey>? RequiredCommonFields { get; init; }
 }
 
 public sealed record FieldOption

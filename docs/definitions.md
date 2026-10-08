@@ -35,6 +35,7 @@ Every request type (a module) is one JSON file in the `definitions/` folder. Add
 | `fields` | The form, in display order. |
 | `steps` | The route the request takes, in order. |
 | `limits` | Optional amounts that conditional steps compare against. |
+| `requiredCommonFields` | Optional list of the common request fields this module insists on: any of `location`, `project`, `costCentre`. See below. |
 
 ## Field types
 
@@ -44,6 +45,16 @@ Lookup kinds are registered in code. Nine exist: `employee`, `department`, `proj
 
 - `availableSim` and `availableAsset` list items that are free to allocate,
 - `heldSim` and `heldAsset` list the items currently held by the person raising the request.
+
+### Requiring a common field
+
+Every request carries a few common fields (project, location, cost centre) that are optional by default. A definition can make some of them required for its own module only:
+
+```json
+"requiredCommonFields": ["location"]
+```
+
+The allowed values are `location`, `project` and `costCentre`; anything else, or a repeated value, stops the definitions loading with a message naming the file. The form marks those fields as required, and creating a request without one is refused with a field error on that field (for example `locationId`: "Select a location."). Modules without the key behave as before. Housekeeping uses it, so it asks for the location once, in the common fields, and keeps only "Floor or area" in its own section.
 
 ### Starting value from the signed-in user
 
