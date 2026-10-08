@@ -113,17 +113,19 @@ public sealed class EmployeeRepository : IEmployeeRepository
 
     public async Task<IReadOnlyList<LookupItem>> SearchLookupAsync(string q, int take, CancellationToken ct)
     {
+        var filtered = !string.IsNullOrEmpty(q);
         var sql =
             "SELECT e.id AS Id, e.employee_code AS Code, e.full_name AS Label, " +
             "e.employee_code || ' - ' || COALESCE(d.name, '') AS Secondary " +
             "FROM employees e LEFT JOIN departments d ON d.id = e.department_id " +
-            "WHERE " + Active + " AND (" + _dialect.Like("e.full_name", "@Q") + " OR " + _dialect.Like("e.employee_code", "@Q") + ") " +
+            "WHERE " + Active +
+            (filtered ? " AND (" + _dialect.Like("e.full_name", "@Q") + " OR " + _dialect.Like("e.employee_code", "@Q") + ") " : " ") +
             "ORDER BY e.full_name, e.id " + _dialect.LimitOffset("@Limit", "@Offset");
 
         await using var connection = await _factory.OpenAsync(ct);
         var rows = await connection.QueryAsync<LookupRow>(new CommandDefinition(
             sql,
-            new { Q = "%" + _dialect.EscapeLikeValue(q) + "%", Limit = take, Offset = 0 },
+            new { Q = filtered ? "%" + _dialect.EscapeLikeValue(q) + "%" : string.Empty, Limit = take, Offset = 0 },
             cancellationToken: ct));
         return rows.Select(r => new LookupItem(r.Id, r.Code, r.Label, r.Secondary as string)).ToList();
     }

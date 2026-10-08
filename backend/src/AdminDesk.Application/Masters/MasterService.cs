@@ -7,7 +7,6 @@ public sealed class MasterService : IMasterService
 {
     public const int MaxLookupTake = 50;
     public const int MaxPageSize = 100;
-    public const int MinSearchLength = 2;
 
     private static readonly string[] SeeEveryone = { Roles.Admin, Roles.HR, Roles.Management, Roles.SystemAdmin };
 
@@ -24,10 +23,6 @@ public sealed class MasterService : IMasterService
     {
         var provider = _lookups.Find(kind) ?? throw new NotFoundException($"Unknown lookup '{kind}'.");
         var text = q?.Trim() ?? string.Empty;
-        if (text.Length < MinSearchLength)
-        {
-            return Array.Empty<LookupItem>();
-        }
         return await provider.SearchAsync(text, Math.Clamp(take, 1, MaxLookupTake), ct);
     }
 

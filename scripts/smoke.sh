@@ -249,6 +249,20 @@ main_mode() {
   call GET /api/config/public
   assert_eq "demo data: ten demo accounts are listed" "$(jget d.data.demoAccounts.length)" 10
 
+  # ------------------------------------------------- lookups list on open
+  for kind in employee department project location costCentre; do
+    call GET "/api/lookups/$kind?take=5" "$T_EMP"
+    assert_status "lookups: $kind with no text answers 200" 200
+    assert_true "lookups: $kind with no text lists 1 to 5 items" "$(jget 'd.data.length >= 1 && d.data.length <= 5')"
+    call GET "/api/lookups/$kind" "$T_EMP"
+    assert_status "lookups: $kind without q or take answers 200" 200
+    assert_true "lookups: $kind without q or take lists items" "$(jget 'd.data.length >= 1')"
+  done
+  call GET "/api/lookups/employee?q=P&take=5" "$T_EMP"
+  assert_true "lookups: a one-character search returns employees" "$(jget 'd.data.length >= 1')"
+  call GET "/api/lookups/employee?take=51" "$T_EMP"
+  assert_status "lookups: take above the cap gets 400" 400
+
   call GET "/api/requests/inbox?page=1&pageSize=100" "$T_MGR"
   assert_true "demo data: the manager's inbox has at least 3 requests" "$(jget 'd.data.total >= 3')"
 

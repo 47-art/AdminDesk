@@ -27,14 +27,16 @@ public abstract class SimpleMasterLookupProvider : ILookupProvider
 
     public async Task<IReadOnlyList<LookupItem>> SearchAsync(string q, int take, CancellationToken ct)
     {
+        var filtered = !string.IsNullOrEmpty(q);
         var sql = Select +
-            "WHERE " + AuditSql.Active("t") + " AND (" + _dialect.Like("t.name", "@Q") + " OR " + _dialect.Like("t.code", "@Q") + ") " +
+            "WHERE " + AuditSql.Active("t") +
+            (filtered ? " AND (" + _dialect.Like("t.name", "@Q") + " OR " + _dialect.Like("t.code", "@Q") + ") " : " ") +
             "ORDER BY t.name, t.id " + _dialect.LimitOffset("@Limit", "@Offset");
 
         await using var connection = await _factory.OpenAsync(ct);
         var rows = await connection.QueryAsync<LookupItem>(new CommandDefinition(
             sql,
-            new { Q = "%" + _dialect.EscapeLikeValue(q) + "%", Limit = take, Offset = 0 },
+            new { Q = filtered ? "%" + _dialect.EscapeLikeValue(q) + "%" : string.Empty, Limit = take, Offset = 0 },
             cancellationToken: ct));
         return rows.ToList();
     }
