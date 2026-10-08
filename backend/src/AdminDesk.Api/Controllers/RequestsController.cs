@@ -32,7 +32,8 @@ public class RequestsController : ControllerBase
     {
         var actor = _actors.Create(User);
         var id = await _workflow.CreateAsync(actor, body.ToCommand(), ct);
-        var detail = await _queries.GetDetailAsync(actor, id, ct);
+        // The request is already saved; a client that gave up must not turn that into an error and a retry.
+        var detail = await _queries.GetDetailAsync(actor, id, CancellationToken.None);
         return StatusCode(StatusCodes.Status201Created, ApiResponse<RequestDetailDto>.Ok(detail));
     }
 
@@ -45,7 +46,7 @@ public class RequestsController : ControllerBase
     {
         var actor = _actors.Create(User);
         await _workflow.ActAsync(actor, id, body.ToCommand(), ct);
-        return Ok(ApiResponse<RequestDetailDto>.Ok(await _queries.GetDetailAsync(actor, id, ct)));
+        return Ok(ApiResponse<RequestDetailDto>.Ok(await _queries.GetDetailAsync(actor, id, CancellationToken.None)));
     }
 
     [HttpGet("{id:long}/audit")]
