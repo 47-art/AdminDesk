@@ -17,6 +17,7 @@ public sealed class DefinitionsModule : IServiceModule
         services.AddScoped<IDefinitionRepository, DefinitionRepository>();
         services.AddScoped<ILimitRepository, LimitRepository>();
         services.AddScoped<IModuleCatalogService, ModuleCatalogService>();
+        services.AddScoped<IModuleConfigService, ModuleConfigService>();
 
         services.AddScoped<IStartupTask, DefinitionSyncTask>();
     }

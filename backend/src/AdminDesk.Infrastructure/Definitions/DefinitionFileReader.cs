@@ -1,9 +1,7 @@
 using System.Collections;
 using System.Reflection;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using AdminDesk.Domain.Definitions;
 using AdminDesk.SharedKernel.Constants;
 using Microsoft.Extensions.Configuration;
@@ -13,30 +11,6 @@ namespace AdminDesk.Infrastructure.Definitions;
 public sealed record LoadedDefinition(string File, ModuleDefinition Definition, string Json, string ContentHash);
 
 public sealed record DefinitionReadResult(IReadOnlyList<LoadedDefinition> Definitions, IReadOnlyList<string> Problems);
-
-// The one set of parsing rules for definition text: unknown properties and unknown or numeric
-// enum values are errors, names are camelCase.
-public static class DefinitionJson
-{
-    public static readonly JsonSerializerOptions Options = Create();
-
-    private static JsonSerializerOptions Create()
-    {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-            ReadCommentHandling = JsonCommentHandling.Disallow,
-            AllowTrailingCommas = false
-        };
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, allowIntegerValues: false));
-        return options;
-    }
-
-    public static ModuleDefinition Parse(string json) =>
-        JsonSerializer.Deserialize<ModuleDefinition>(json, Options)
-        ?? throw new JsonException("The definition is empty.");
-}
 
 // Reads the embedded definition files and, when configured, the files of an override
 // folder. A file in the override folder replaces the embedded file of the same name;
@@ -109,7 +83,7 @@ public sealed class DefinitionFileReader
 
             try
             {
-                loaded.Add(new LoadedDefinition(name, DefinitionJson.Parse(json), json, Hash(bytes)));
+                loaded.Add(new LoadedDefinition(name, DefinitionJson.Parse(json), json, DefinitionHash.Of(bytes)));
             }
             catch (JsonException ex)
             {
@@ -125,8 +99,6 @@ public sealed class DefinitionFileReader
         var text = Encoding.UTF8.GetString(bytes);
         return text.Length > 0 && text[0] == '﻿' ? text[1..] : text;
     }
-
-    private static string Hash(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 }
 
 // Walks a parsed document against the model types so that every unknown property and

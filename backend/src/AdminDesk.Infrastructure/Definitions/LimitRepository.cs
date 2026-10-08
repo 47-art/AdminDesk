@@ -2,6 +2,7 @@ using System.Data.Common;
 using AdminDesk.Application.Abstractions.Persistence;
 using AdminDesk.Application.Definitions;
 using AdminDesk.Infrastructure.Persistence;
+using AdminDesk.SharedKernel.Constants;
 using Dapper;
 
 namespace AdminDesk.Infrastructure.Definitions;
@@ -62,6 +63,41 @@ public sealed class LimitRepository : ILimitRepository
         return (await connection.QueryAsync<StoredLimit>(new CommandDefinition(sql, cancellationToken: ct)))
             .Select(row => row.ToRow())
             .ToList();
+    }
+
+    public async Task<LimitRow?> GetAsync(string moduleCode, string stepKey, string limitKey, CancellationToken ct)
+    {
+        var sql =
+            "SELECT " + Columns + " FROM module_limits l WHERE l.module_code = @ModuleCode AND l.step_key = @StepKey " +
+            "AND l.limit_key = @LimitKey AND " + AuditSql.Active("l");
+        await using var connection = await _factory.OpenAsync(ct);
+        var row = await connection.QuerySingleOrDefaultAsync<StoredLimit>(
+            new CommandDefinition(sql, new { ModuleCode = moduleCode, StepKey = stepKey, LimitKey = limitKey }, cancellationToken: ct));
+        return row?.ToRow();
+    }
+
+    public async Task<long?> UpdateValueAsync(
+        DbTransaction transaction, string moduleCode, string stepKey, string limitKey, long newValueMinor, CancellationToken ct)
+    {
+        var where = "module_code = @ModuleCode AND step_key = @StepKey AND limit_key = @LimitKey AND " +
+                    AuditColumns.IsActive + " = 1 AND " + AuditColumns.DeletedUtc + " IS NULL";
+        var parameters = new DynamicParameters(_stamper.ForUpdate());
+        parameters.Add("ModuleCode", moduleCode);
+        parameters.Add("StepKey", stepKey);
+        parameters.Add("LimitKey", limitKey);
+        parameters.Add("ValueMinor", newValueMinor);
+
+        var previous = await transaction.Connection!.ExecuteScalarAsync<long?>(new CommandDefinition(
+            "SELECT value_minor FROM module_limits WHERE " + where, parameters, transaction, cancellationToken: ct));
+        if (previous is null)
+        {
+            return null;
+        }
+        // A value set by a person is no longer the shipped sample value.
+        await transaction.Connection!.ExecuteAsync(new CommandDefinition(
+            "UPDATE module_limits SET value_minor = @ValueMinor, is_sample = 0, " + AuditSql.UpdateSet + " WHERE " + where,
+            parameters, transaction, cancellationToken: ct));
+        return previous;
     }
 
     // The database hands back 64-bit integers, so rows are read into settable properties first.

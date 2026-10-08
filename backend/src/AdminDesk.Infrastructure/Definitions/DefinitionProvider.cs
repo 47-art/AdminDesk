@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using AdminDesk.Application.Definitions;
+using AdminDesk.Domain.Definitions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace AdminDesk.Infrastructure.Definitions;
