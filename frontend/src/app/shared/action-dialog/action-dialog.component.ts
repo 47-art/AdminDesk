@@ -56,6 +56,10 @@ export class RequestActionRunner {
   }
 }
 
+export const REJECT_HELP =
+  "Use this when the request can't or won't be done. The requester will see your reason, and the request will be marked Rejected.";
+export const CANCEL_HELP = 'Use this if you no longer need this request.';
+
 const REASON_ERRORS: Record<'Reject' | 'Cancel', string> = {
   Reject: 'Enter a reason so the requester knows why.',
   Cancel: 'Give a reason for cancelling.',
@@ -104,6 +108,7 @@ const REASON_ERRORS: Record<'Reject' | 'Cancel', string> = {
         @if (action() === 'Cancel') {
           <p class="body">The request will stop and cannot be restarted. You can raise a new request instead.</p>
         }
+        <p class="body" id="action-reason-help">{{ helpText() }}</p>
         <div class="field">
           <label for="action-reason">{{ reasonLabel() }}</label>
           <textarea
@@ -112,7 +117,7 @@ const REASON_ERRORS: Record<'Reject' | 'Cancel', string> = {
             rows="4"
             [attr.maxlength]="maxLength"
             [formControl]="reason"
-            [attr.aria-describedby]="'action-reason-error'"
+            [attr.aria-describedby]="'action-reason-help action-reason-error'"
             [attr.aria-invalid]="reasonError() ? 'true' : null"
           ></textarea>
           <app-field-error id="action-reason-error" [message]="reasonError()" />
@@ -182,6 +187,7 @@ export class ActionDialogComponent {
   protected readonly reasonLabel = computed(() =>
     this.action() === 'Reject' ? 'Reason for rejection (required)' : 'Why are you cancelling this request?',
   );
+  protected readonly helpText = computed(() => (this.action() === 'Reject' ? REJECT_HELP : CANCEL_HELP));
   protected readonly confirmLabel = computed(() => {
     switch (this.action()) {
       case 'Reject':

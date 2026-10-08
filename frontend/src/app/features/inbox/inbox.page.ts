@@ -14,8 +14,10 @@ import { FieldDto, ModuleSummary, Priority, RequestDetail, RequestListItem } fro
 import { ModulesApi } from '../../core/api/modules.api';
 import { RequestsApi } from '../../core/api/requests.api';
 import { PRIORITIES } from '../../core/constants/field-types';
+import { ROLE_GROUPS } from '../../core/constants/roles';
 import { ROUTE_PATHS } from '../../core/constants/routes';
 import { REQUEST_STATUS_STYLES, STEP_STATE_STYLES } from '../../core/constants/statuses';
+import { AuthService } from '../../core/auth/auth.service';
 import { BadgeCountsService } from '../../core/state/badge-counts.service';
 import { NotificationService } from '../../core/notifications/notification.service';
 import {
@@ -241,7 +243,7 @@ interface Option<T> {
               >
                 {{ label(row) }}
               </button>
-              @if (row.currentStepType === 'Approval') {
+              @if (canReject(row)) {
                 <button
                   pButton
                   type="button"
@@ -322,7 +324,7 @@ interface Option<T> {
                   >
                     {{ label(row) }}
                   </button>
-                  @if (row.currentStepType === 'Approval') {
+                  @if (canReject(row)) {
                     <button
                       pButton
                       type="button"
@@ -363,6 +365,7 @@ export class InboxPage implements OnInit {
   private readonly requestsApi = inject(RequestsApi);
   private readonly modulesApi = inject(ModulesApi);
   private readonly runner = inject(RequestActionRunner);
+  private readonly auth = inject(AuthService);
   private readonly badges = inject(BadgeCountsService);
   private readonly notifications = inject(NotificationService);
   private readonly destroyRef = inject(DestroyRef);
@@ -399,6 +402,7 @@ export class InboxPage implements OnInit {
     label: string | null;
   } | null>(null);
 
+  protected readonly isOverride = computed(() => this.auth.hasAnyRole(ROLE_GROUPS.RequestOverride));
   protected readonly moduleOptions = computed<Option<string>[]>(() => [
     { label: 'All modules', value: null },
     ...this.modules().map((m) => ({ label: m.name, value: m.code })),
@@ -497,6 +501,11 @@ export class InboxPage implements OnInit {
 
   protected detailLink(row: RequestListItem): unknown[] {
     return ['/', ROUTE_PATHS.RequestDetail, row.id];
+  }
+
+  /** Reject shows on approval rows for everyone, and on every row for the override role. The server decides. */
+  protected canReject(row: RequestListItem): boolean {
+    return row.currentStepType === 'Approval' || this.isOverride();
   }
 
   protected label(row: RequestListItem): string {
