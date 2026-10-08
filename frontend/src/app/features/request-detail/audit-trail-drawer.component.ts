@@ -46,8 +46,8 @@ import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.
       (click)="open()"
     ></button>
     <p-drawer
-      [visible]="visible()"
-      (visibleChange)="onVisibleChange($event)"
+      [(visible)]="visible"
+      (onHide)="returnFocus()"
       position="right"
       header="Audit trail"
       [modal]="true"
@@ -114,9 +114,9 @@ export class AuditTrailDrawerComponent {
     if (this.loadedKey !== this.key()) this.load();
   }
 
-  protected onVisibleChange(open: boolean): void {
-    this.visible.set(open);
-    if (!open) setTimeout(() => this.trigger().nativeElement.focus());
+  /** Runs when the drawer closes by any route (Esc, click outside, close button). */
+  protected returnFocus(): void {
+    this.trigger().nativeElement.focus();
   }
 
   protected load(): void {

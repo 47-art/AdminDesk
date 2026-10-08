@@ -88,7 +88,9 @@ body {
   *,
   *::before,
   *::after {
-    animation: none !important;
+    /* Near-zero rather than none: overlay masks are removed on animationend, which never fires for "none". */
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition: none !important;
     scroll-behavior: auto !important;
   }
