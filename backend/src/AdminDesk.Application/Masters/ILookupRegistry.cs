@@ -12,6 +12,9 @@ public interface ILookupProvider
     Task<IReadOnlyList<LookupItem>> SearchForActorAsync(string q, int take, long? actorEmployeeId, CancellationToken ct) =>
         SearchAsync(q, take, ct);
 
+    // True when the item is currently held by the given person. Only the held-item kinds can answer yes.
+    Task<bool> IsHeldByAsync(long id, long employeeId, CancellationToken ct) => Task.FromResult(false);
+
     // The label of one item, whether or not it is still active.
     Task<LookupItem?> GetAsync(long id, CancellationToken ct);
 

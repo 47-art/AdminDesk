@@ -41,14 +41,14 @@ public class LookupsController : ControllerBase
     public async Task<ActionResult<ApiResponse<IReadOnlyList<LookupItem>>>> Search(
         string kind, [FromQuery] LookupQuery query, CancellationToken ct)
     {
-        var items = await _masters.SearchLookupAsync(kind, query.Q, query.Take, User.EmployeeId(), ct);
+        var items = await _masters.SearchLookupAsync(kind, query.Q, query.Take, User.EmployeeId(), User.RoleNames(), ct);
         return Ok(ApiResponse<IReadOnlyList<LookupItem>>.Ok(items));
     }
 
     [HttpGet("{kind}/{id:long}")]
     public async Task<ActionResult<ApiResponse<LookupItem>>> Get(string kind, long id, CancellationToken ct)
     {
-        var item = await _masters.GetLookupAsync(kind, id, ct);
+        var item = await _masters.GetLookupAsync(kind, id, User.EmployeeId(), User.RoleNames(), ct);
         return Ok(ApiResponse<LookupItem>.Ok(item));
     }
 }

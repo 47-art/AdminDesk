@@ -274,6 +274,33 @@ internal sealed class EngineProbeMasterChecks
         await _k.ExecuteRawAsync($"UPDATE sims SET status = 'Available', holder_employee_id = NULL WHERE id = {sim}");
         _k.Check(!await _k.Lookups.ExistsAsync(MasterLookupKinds.HeldSim, sim, ct) && !await _k.Lookups.ExistsAsync(MasterLookupKinds.AvailableAsset, 999999, ct),
             "36: held validation or an unknown id gave the wrong answer");
+
+        // The lookup endpoints are limited by role: available items need a viewer role, held items by id need
+        // the holder or a viewer role.
+        var masters = _k.Services.GetRequiredService<IMasterService>();
+        var employeeRoles = new[] { Roles.Employee };
+        var itRoles = new[] { Roles.Employee, Roles.IT };
+        var adminRoles = new[] { Roles.Employee, Roles.Admin };
+        var colleagueId = await _k.EmployeeIdAsync("E0009");
+        foreach (var kind in new[] { MasterLookupKinds.AvailableSim, MasterLookupKinds.AvailableAsset })
+        {
+            await _k.ExpectAsync<NotFoundException>($"36: {kind} search by an employee", () => masters.SearchLookupAsync(kind, null, 20, _demo, employeeRoles, ct));
+            _k.Check((await masters.SearchLookupAsync(kind, null, 20, colleagueId, itRoles, ct)).Count > 0
+                && (await masters.SearchLookupAsync(kind, null, 20, colleagueId, adminRoles, ct)).Count > 0,
+                $"36: {kind} search by IT or Admin returned nothing");
+            var someId = kind == MasterLookupKinds.AvailableSim ? availableSimIds[0] : availableAssetIds[0];
+            await _k.ExpectAsync<NotFoundException>($"36: {kind} read by id by an employee", () => masters.GetLookupAsync(kind, someId, _demo, employeeRoles, ct));
+            _k.Check((await masters.GetLookupAsync(kind, someId, null, itRoles, ct)).Id == someId, $"36: {kind} read by id by IT failed");
+        }
+        foreach (var (kind, table) in new[] { (MasterLookupKinds.HeldSim, "sims"), (MasterLookupKinds.HeldAsset, "assets") })
+        {
+            var own = await _k.ScalarAsync<long>($"SELECT MIN(id) FROM {table} WHERE holder_employee_id = @D AND status = 'Allocated'", new { D = _demo });
+            var others = await _k.ScalarAsync<long>($"SELECT MIN(id) FROM {table} WHERE holder_employee_id <> @D AND status = 'Allocated'", new { D = _demo });
+            _k.Check((await masters.GetLookupAsync(kind, own, _demo, employeeRoles, ct)).Id == own, $"36: an employee could not read their own {kind} item");
+            await _k.ExpectAsync<NotFoundException>($"36: {kind} item of another employee", () => masters.GetLookupAsync(kind, others, _demo, employeeRoles, ct));
+            await _k.ExpectAsync<NotFoundException>($"36: {kind} item read without an employee record", () => masters.GetLookupAsync(kind, own, null, employeeRoles, ct));
+            _k.Check((await masters.GetLookupAsync(kind, others, colleagueId, itRoles, ct)).Id == others, $"36: {kind} item read by IT failed");
+        }
         _k.Pass("36 lookups offer only eligible items");
     }
 

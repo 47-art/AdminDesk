@@ -116,6 +116,19 @@ public abstract class MasterItemLookupProvider : ILookupProvider
         return rows.Select(r => r.ToItem()).ToList();
     }
 
+    public async Task<bool> IsHeldByAsync(long id, long employeeId, CancellationToken ct)
+    {
+        if (!_held)
+        {
+            return false;
+        }
+        await using var connection = await _factory.OpenAsync(ct);
+        var count = await connection.ExecuteScalarAsync<int>(new CommandDefinition(
+            $"SELECT COUNT(*) FROM {_table} t WHERE t.id = @Id AND t.holder_employee_id = @Holder AND " + Eligible,
+            new { Id = id, Holder = employeeId }, cancellationToken: ct));
+        return count > 0;
+    }
+
     public async Task<bool> ExistsAsync(long id, CancellationToken ct)
     {
         await using var connection = await _factory.OpenAsync(ct);
