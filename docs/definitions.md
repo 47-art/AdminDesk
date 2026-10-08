@@ -96,11 +96,11 @@ Operators: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `in`, `notIn`, `isEmpty`, `isN
 ]
 ```
 
-Limits are optional; the shipped modules declare none. Once stored they are held in the database and can be edited there. The sample `scripts/fixtures/routing/routingcheck.json` has a conditional step and a sample limit.
+Limits are optional; SIM and laptop declare a Finance limit of zero. Once stored they are held in the database and are edited on the Limits and conditions page (Management and System admin). A limit edit applies to new requests only, and a condition edit publishes a new definition version; a file version equal to or lower than a stored edit is ignored, so raise the file version to replace it. The sample `scripts/fixtures/routing/routingcheck.json` has a conditional step and a sample limit.
 
 ## Add-on seam
 
-An `IRequestHook` interface is called inside the transaction of each action (when a request is created, when a step is done and when the request ends). Nothing implements it yet and a definition has no effects key.
+An `IRequestHook` interface is called inside the transaction of each action (when a request is created, when a step is done and when the request ends). The master update steps of the SIM, laptop, asset return and ID card modules use it to change the masters; a definition has no effects key.
 
 ## Versioning
 

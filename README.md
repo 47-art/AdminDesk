@@ -127,23 +127,37 @@ The process description leaves some things open. What was chosen:
 10. Waiting for me is open to every role, so a requester sees their own confirmation tasks there. Its SLA column is a placeholder.
 11. A step that nobody can act on, for example a reporting-manager approval for someone who has no manager, simply waits; nothing is skipped automatically. The person who raised it can cancel it with a reason. A request raised by the Management demo user waits at its first step for exactly this reason: that user's reporting manager is the top of the hierarchy (employee E0011), who has no login and no demo account.
 12. The Audit trail section on the request page is visible to Admin, System admin and Management only.
-13. Approval limits are held in the database (the shipped modules declare none) and can be edited there until the limits editor exists.
-14. The Management role exists, but no shipped module routes to Management yet: approval by Management arrives with the modules whose approval rules need it, so a Management login sees an empty Waiting for me list. Management is read-only across the organisation (every request, the All requests page, organisation counters and the audit trail) and approves only at steps assigned to it, as limits are configured. The System admin is a technical role: it configures definitions, limits and background jobs as those screens arrive, takes no business actions and is not part of any approval chain. Its menu is minimal (Dashboard and People for now); the request lists and New request are closed to it, while a direct link to a request still opens read-only for support. Only the Admin has the operational override (reject at any step).
+13. Limits and step conditions are edited on the Limits and conditions page by Management and System admin together. The process description does not name an owner: Management owns the money policy and System admin applies it. Management stays read-only everywhere else, and every change is in the audit trail with the old and new values. Edits apply to new requests only: limits are copied onto each request when it is created, and a condition edit publishes a new definition version, so requests in progress keep theirs. A definition file whose version is equal to or lower than a stored edit is ignored, so bump the file version above the stored one.
+14. The Management role is read-only across the organisation (every request, the All requests page, organisation counters and the audit trail) and approves only at steps assigned to it. No shipped module routes to Management, so a Management login sees an empty Waiting for me list. The System admin is a technical role: it configures definitions and limits and sees the Module definitions page, takes no business actions and is not part of any approval chain. The request lists and New request are closed to it, while a direct link to a request still opens read-only for support. Only the Admin has the operational override (reject at any step).
 15. Segregation of duties: the process description does not say whether a person may approve their own request, so nobody can approve or reject their own request at an approval step, even when they hold the role of that step (for example a Store person raising a stationery request cannot do the Admin or Store verification; an Admin can). Task steps (issuing, stock confirmation, receipt confirmation) are not affected, and the Admin's operational reject override still applies.
 16. The people directory (the People page in the menu) is open to managers, Admin, HR, Management and System admin. Managers see their direct reports; the others see everyone. Each row shows the code, name, designation, department and location; email addresses are not shown.
 17. The process description does not say who completes the courier proof of delivery upload, so it is a task for the Admin, after the requester has confirmed delivery. The step cannot be completed until a document has been uploaded for it.
+18. Finance approval on the SIM and Laptop requests is a step taken from the approval matrix, because the individual flows do not show it. It is required only when the entered cost is above the Finance limit, which is zero by default (any payment involved); an empty cost never triggers it. Management is not in those rows. The cost field is an addition to the two forms so the "if required" rule has a value to compare.
+19. The approval matrix is seeded only for the modules that exist now (SIM and Laptop or IT asset). The rows for Travel, Advances, Petty Cash, Purchase, Maintenance and the others arrive with those modules.
+20. Actors the process description does not name: Welfare approval is by the reporting manager; Courier proof of delivery is uploaded by the Admin; a SIM return is handed in by the employee and then verified by the Admin; the Laptop and asset steps are shared by IT and Admin; ID card verification is by HR and printing and handover by Admin; SIM verification, allocation and activation are Admin steps; housekeeping has no approval step and is handled by the Admin; acknowledgement and confirmation steps belong to the requester.
+21. SIM return and Asset return are separate modules from the request flows. A SIM replacement or transfer request records its type in the history, and the old SIM is returned through a SIM return request.
+22. Nobody can approve or reject their own request at an approval step, even when they hold the role of that step.
+23. Documents are stored on local disk under the data folder. PDF, image and Office files up to 5 MB are accepted. Removing a document is a soft delete that keeps the file and the audit rows, every download is audited, and Management and System admin are read-only. The ID card photo is attached as a supporting document.
+24. Masters (SIM, laptop and IT asset, ID card) are seeded sample data shown on the Masters page. Records are maintained by their owning roles, and Management can manage all of them: the SIM master by Admin and Management; the laptop and IT asset master by IT, Admin and Management; the ID card master by HR, Admin and Management. Everyone else, System admin included, is read-only, and HR sees the ID card master only. Retiring a record sets an inactive flag and a timestamp (nothing is deleted) and is refused while the item is held. Every change is audited with the old and new values, and holder and status change only through the request flows. The process description names no maintainer beyond the Admin, IT and HR steps. Asset condition and any damage or loss cost are recorded at return, and an ID card replacement keeps the old card as Replaced.
 
-## Not yet built
+## Not built in this release
 
-- Settings and Masters pages, global search
+Left out on purpose:
+
+- the JSON definition editor (definitions are viewed on the Module definitions page and edited as files)
+- a phone-sized layout for approvals
+- the vehicle master and trips
+- guest house rooms
+- event, parking, food and pantry, vehicle, and uniform and PPE modules
+
+Not built yet:
+
+- Settings page and global search
 - the jobs dashboard
-- a definitions viewer and a limits editor
-- document upload: the documents slot on the request page is reserved, and supporting documents are only partially covered until upload exists
-- the upload screen for the courier proof-of-delivery step: the step is defined and the server refuses to complete it without a document, but the web upload control is not built yet
 - the automatic stock effect of the stock update step
 - notifications and background business jobs
-- other modules
-- service levels: the SLA column in Waiting for me is a placeholder showing "Not set" until a later phase adds them, and the age colours there use placeholder thresholds
+- the remaining modules
+- service levels: the SLA column in Waiting for me is a placeholder showing "Not set", and the age colours there use placeholder thresholds
 
 ## Checks
 
