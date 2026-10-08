@@ -13,5 +13,10 @@ public sealed class EngineModule : IServiceModule
     {
         services.AddScoped<IRequestRepository, RequestRepository>();
         services.AddScoped<IAuditRepository, AuditRepository>();
+
+        services.AddScoped<DefinitionPayloadValidator>();
+        services.AddScoped<SubjectRenderer>();
+        services.AddScoped<RequestAccessPolicy>();
+        services.AddScoped<IRequestWorkflowService, RequestWorkflowService>();
     }
 }
