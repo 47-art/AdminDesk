@@ -426,7 +426,8 @@ public sealed class ModuleConfigService : IModuleConfigService
     {
         var ok = field.Type switch
         {
-            FieldType.Money or FieldType.Lookup => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
+            FieldType.Money => value.ValueKind == JsonValueKind.Number && value.TryGetDecimal(out var rupees) && decimal.Round(rupees, 2) == rupees,
+            FieldType.Lookup => value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _),
             FieldType.Number => value.ValueKind == JsonValueKind.Number,
             FieldType.YesNo => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
             _ => value.ValueKind == JsonValueKind.String
@@ -435,7 +436,7 @@ public sealed class ModuleConfigService : IModuleConfigService
         {
             error("condition.value", field.Type switch
             {
-                FieldType.Money => "Enter a whole number of paise.",
+                FieldType.Money => "Enter an amount in rupees with at most two decimals.",
                 FieldType.Lookup => "Enter the whole-number id.",
                 FieldType.Number => "Enter a number.",
                 FieldType.YesNo => "Choose yes or no.",

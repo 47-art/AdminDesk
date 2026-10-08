@@ -3,7 +3,8 @@ using System.Text.Json;
 namespace AdminDesk.Application.Definitions;
 
 // A rule as stored: a group (any / all) or a single rule (field, op and either value or limit).
-// Money values in a rule are minor units, the same as in the stored form data.
+// Money values in a rule are written in rupees, as in the definition files; the engine converts them
+// to paise when it decides a step. Limit amounts are different: they are stored in paise.
 public sealed record RuleNodeDto(
     IReadOnlyList<RuleNodeDto>? Any,
     IReadOnlyList<RuleNodeDto>? All,
