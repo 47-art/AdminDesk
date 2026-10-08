@@ -45,13 +45,13 @@ public sealed class EmployeeRepository : IEmployeeRepository
         GetOneAsync("e.employee_code = @Value", code, ct);
 
     public Task<EmployeeRecord?> GetByEmailAsync(string email, CancellationToken ct) =>
-        GetOneAsync("e.email = @Value COLLATE NOCASE", email, ct);
+        GetOneAsync(_dialect.EqualsIgnoreCase("e.email", "@Value"), email, ct);
 
     private async Task<EmployeeRecord?> GetOneAsync(string predicate, object value, CancellationToken ct)
     {
         await using var connection = await _factory.OpenAsync(ct);
         return await connection.QueryFirstOrDefaultAsync<EmployeeRecord>(new CommandDefinition(
-            RecordSelect + "WHERE " + predicate + " AND " + Active + " LIMIT 1",
+            RecordSelect + "WHERE " + predicate + " AND " + Active + " " + _dialect.LimitOffset("1", "0"),
             new { Value = value }, cancellationToken: ct));
     }
 

@@ -15,11 +15,13 @@ public sealed class DefinitionRepository : IDefinitionRepository
 
     private readonly IDbConnectionFactory _factory;
     private readonly AuditStamper _stamper;
+    private readonly ISqlDialect _dialect;
 
-    public DefinitionRepository(IDbConnectionFactory factory, AuditStamper stamper)
+    public DefinitionRepository(IDbConnectionFactory factory, AuditStamper stamper, ISqlDialect dialect)
     {
         _factory = factory;
         _stamper = stamper;
+        _dialect = dialect;
     }
 
     public async Task<long> InsertAsync(DbTransaction transaction, DefinitionRow row, CancellationToken ct)
@@ -35,11 +37,10 @@ public sealed class DefinitionRepository : IDefinitionRepository
         parameters.Add("Json", row.DefinitionJson);
         parameters.Add("Hash", row.ContentHash);
 
-        var sql =
+        var sql = _dialect.InsertReturningId(
             "INSERT INTO module_definitions (code, version, name, category, prefix, definition_json, content_hash, " +
             AuditSql.InsertColumns + ") " +
-            "VALUES (@Code, @Version, @Name, @Category, @Prefix, @Json, @Hash, " + AuditSql.InsertValues + ");" +
-            "SELECT last_insert_rowid();";
+            "VALUES (@Code, @Version, @Name, @Category, @Prefix, @Json, @Hash, " + AuditSql.InsertValues + ")");
         return await transaction.Connection!.ExecuteScalarAsync<long>(
             new CommandDefinition(sql, parameters, transaction, cancellationToken: ct));
     }

@@ -18,6 +18,12 @@ public interface ISqlDialect
     // Case-insensitive contains/prefix predicate; pair it with EscapeLikeValue on the input.
     string Like(string column, string param);
 
+    // Equality of a column and a parameter ignoring letter case.
+    string EqualsIgnoreCase(string column, string param);
+
+    // Adds the clause that makes an INSERT statement return the new row's integer id.
+    string InsertReturningId(string insertSql);
+
     // Escapes wildcard characters in user input used with Like.
     string EscapeLikeValue(string value);
 }

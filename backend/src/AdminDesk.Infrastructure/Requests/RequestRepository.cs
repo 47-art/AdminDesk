@@ -66,7 +66,7 @@ public sealed class RequestRepository : IRequestRepository
         p.Add("ParentRequestId", null);
         p.Add("ClosedUtc", request.ClosedUtc);
 
-        var sql =
+        var sql = _dialect.InsertReturningId(
             "INSERT INTO requests (request_no, module_code, definition_id, definition_version, requester_employee_id, " +
             "department_id, project_id, location_id, cost_centre_id, request_date, required_date, priority, subject, " +
             "approval_status, current_status, current_step_key, current_step_seq, responsible_employee_id, " +
@@ -76,7 +76,7 @@ public sealed class RequestRepository : IRequestRepository
             "@DepartmentId, @ProjectId, @LocationId, @CostCentreId, @RequestDate, @RequiredDate, @Priority, @Subject, " +
             "@ApprovalStatus, @CurrentStatus, @CurrentStepKey, @CurrentStepSeq, @ResponsibleEmployeeId, " +
             "@ResponsibleRole, @Remarks, @PayloadJson, @AmountMinor, @ParentRequestId, @ClosedUtc, " +
-            AuditSql.InsertValues + ") RETURNING id";
+            AuditSql.InsertValues + ")");
         return await tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(sql, p, tx, cancellationToken: ct));
     }
 

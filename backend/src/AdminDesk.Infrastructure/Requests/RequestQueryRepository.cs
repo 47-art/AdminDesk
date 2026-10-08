@@ -87,7 +87,7 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
         "SELECT e.event_type AS EventType, e.comment AS Comment, e.actor_name AS ActorName, e.actor_role AS ActorRole, " +
         "e.created_utc AS CreatedUtc FROM audit_events e " +
         "WHERE e.request_id = @Id AND e.event_type IN ('" + AuditEventTypes.Cancelled + "', '" + AuditEventTypes.Rejected +
-        "') ORDER BY e.id DESC LIMIT 1";
+        "') ORDER BY e.id DESC";
 
     private readonly IDbConnectionFactory _factory;
     private readonly ISqlDialect _dialect;
@@ -109,7 +109,7 @@ public sealed class RequestQueryRepository : IRequestQueryRepository
 
     public async Task<RequestDetailRows?> GetDetailAsync(long id, CancellationToken ct)
     {
-        var sql = HeaderSql + "WHERE r.id = @Id AND " + AuditSql.Active("r") + "; " + StepsSql + "; " + ActorsSql + "; " + StopSql;
+        var sql = HeaderSql + "WHERE r.id = @Id AND " + AuditSql.Active("r") + "; " + StepsSql + "; " + ActorsSql + "; " + StopSql + " " + _dialect.LimitOffset("1", "0");
 
         await using var connection = await _factory.OpenAsync(ct);
         using var grid = await connection.QueryMultipleAsync(new CommandDefinition(sql, new { Id = id }, cancellationToken: ct));

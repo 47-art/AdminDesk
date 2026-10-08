@@ -23,6 +23,10 @@ public sealed partial class SqliteDialect : ISqlDialect
 
     public string LimitOffset(string limitParam, string offsetParam) => $"LIMIT {limitParam} OFFSET {offsetParam}";
 
+    public string EqualsIgnoreCase(string column, string param) => $"{column} = {param} COLLATE NOCASE";
+
+    public string InsertReturningId(string insertSql) => insertSql + " RETURNING id";
+
     public string NowUtc => "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
     public string Like(string column, string param) => $"{column} LIKE {param} ESCAPE '{LikeEscape}'";
