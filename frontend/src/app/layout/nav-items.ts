@@ -23,4 +23,6 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { label: 'Team requests', path: ROUTE_PATHS.TeamRequests, icon: 'pi pi-sitemap', roles: ROLE_GROUPS.RequestManagers, hiddenForRoles: ROLE_GROUPS.OrganisationWide },
   { label: 'New request', path: ROUTE_PATHS.NewRequest, icon: 'pi pi-plus-circle', roles: [], requiresEmployeeProfile: true, hiddenForRoles: ROLE_GROUPS.TechnicalOnly },
   { label: 'People', path: ROUTE_PATHS.Team, icon: 'pi pi-users', roles: ROLE_GROUPS.Team },
+  { label: 'Limits and conditions', path: ROUTE_PATHS.LimitsConditions, icon: 'pi pi-sliders-h', roles: ROLE_GROUPS.LimitEditors },
+  { label: 'Module definitions', path: ROUTE_PATHS.ModuleDefinitions, icon: 'pi pi-book', roles: ROLE_GROUPS.DefinitionViewers },
 ];

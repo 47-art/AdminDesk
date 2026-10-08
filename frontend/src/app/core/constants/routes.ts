@@ -8,6 +8,8 @@ export const ROUTE_PATHS = {
   NewRequest: 'new',
   RequestDetail: 'request',
   Team: 'team',
+  LimitsConditions: 'limits',
+  ModuleDefinitions: 'definitions',
   Forbidden: 'forbidden',
   NotFound: 'not-found',
 } as const;

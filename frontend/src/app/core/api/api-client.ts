@@ -24,6 +24,12 @@ export class ApiClient {
       .pipe(map((r) => this.unwrap<T>(r.body, r.status)), catchError((e) => this.fail(e)));
   }
 
+  put<T>(url: string, body?: unknown): Observable<T> {
+    return this.http
+      .put<ApiResponse<T>>(url, body ?? {}, { observe: 'response' })
+      .pipe(map((r) => this.unwrap<T>(r.body, r.status)), catchError((e) => this.fail(e)));
+  }
+
   /** Multipart upload; the browser adds the content type with its boundary. */
   postForm<T>(url: string, form: FormData): Observable<T> {
     return this.http

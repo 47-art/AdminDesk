@@ -56,6 +56,16 @@ export const routes: Routes = [
         loadChildren: () => import('./features/admin-pages/admin-pages.routes').then((m) => m.TEAM_ROUTES),
       },
       {
+        path: ROUTE_PATHS.LimitsConditions,
+        canActivate: [roleGuard(ROLE_GROUPS.LimitEditors)],
+        loadChildren: () => import('./features/admin-config/admin-config.routes').then((m) => m.LIMITS_ROUTES),
+      },
+      {
+        path: ROUTE_PATHS.ModuleDefinitions,
+        canActivate: [roleGuard(ROLE_GROUPS.DefinitionViewers)],
+        loadChildren: () => import('./features/admin-config/admin-config.routes').then((m) => m.DEFINITIONS_ROUTES),
+      },
+      {
         path: ROUTE_PATHS.Forbidden,
         loadComponent: () => import('./features/shared-pages/forbidden.page').then((m) => m.ForbiddenPage),
       },

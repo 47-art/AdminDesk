@@ -28,6 +28,10 @@ export const ROLE_GROUPS = {
   TechnicalOnly: [ROLES.SystemAdmin],
   /** Roles that only read documents; they never upload or remove. */
   ReadOnlyOnDocuments: [ROLES.Management, ROLES.SystemAdmin],
+  /** Mirrors the server list of roles that may change limits and step conditions; keep the two in step. */
+  LimitEditors: [ROLES.Management, ROLES.SystemAdmin],
+  /** Roles that may browse every module definition read-only. */
+  DefinitionViewers: [ROLES.SystemAdmin],
   /** Mirrors the server list of roles that may reject any request; keep the two in step. */
   RequestOverride: [ROLES.Admin],
 } as const satisfies Record<string, readonly Role[]>;
