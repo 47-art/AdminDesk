@@ -1,8 +1,8 @@
 {
   "code": "id-card",
-  "version": 1,
+  "version": 2,
   "name": "ID card request",
-  "description": "Ask for a new ID card on joining, or a replacement. HR verifies the details, Admin prints the card and hands it over, you acknowledge it and the ID card master is updated.",
+  "description": "Ask for a new ID card on joining, or a replacement. HR verifies the details, Admin prints the card and hands it over, you acknowledge it and the ID card master is updated. Attach your photo as a document on the request.",
   "category": "Visitors and others",
   "icon": "pi-id-card",
   "prefix": "IDC",
@@ -11,10 +11,6 @@
     {
       "key": "requestType", "label": "Request type", "type": "select", "required": true, "section": "Request",
       "options": [ { "value": "Joining", "label": "Joining" }, { "value": "Replacement", "label": "Replacement" } ]
-    },
-    {
-      "key": "details", "label": "Employee details for the card", "type": "longText", "maxLength": 500, "fullWidth": true, "section": "Request",
-      "helpText": "Name and designation as they should appear on the card. Attach your photo as a document on the request."
     },
     {
       "key": "reason", "label": "Reason for replacement", "type": "longText", "required": true, "maxLength": 500, "fullWidth": true, "section": "Replacement",

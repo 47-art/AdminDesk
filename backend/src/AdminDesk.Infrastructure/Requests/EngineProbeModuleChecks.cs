@@ -372,16 +372,18 @@ internal sealed class EngineProbeModuleChecks
             () => _k.CreateAsync(_k.Requester, "id-card", new { requestType = "Replacement", reason = "Lost on a trip" }));
 
         // Joining needs neither; values sent anyway are ignored and not stored.
-        var joining = await _k.CreateAsync(_k.Requester, "id-card", new { requestType = "Joining", details = "Priya Nair, Analyst", reason = "ignored", oldCardStatus = "Lost" });
+        var joining = await _k.CreateAsync(_k.Requester, "id-card", new { requestType = "Joining", reason = "ignored", oldCardStatus = "Lost" });
         await AssertStepsAsync(joining, "id-card");
         _k.Check(await StoredPayloadValueAsync(joining, "reason") is null && await StoredPayloadValueAsync(joining, "oldCardStatus") is null,
             "43: hidden replacement values were stored for a joining request");
-        _k.Check(await StoredPayloadValueAsync(joining, "details") == "Priya Nair, Analyst", "43: the card details were not stored");
+        var idCard = await _k.Definitions.GetActiveAsync("id-card");
+        _k.Check(idCard is not null && idCard.Definition.Version == 2 && idCard.Definition.Fields!.All(f => f.Key != "details"),
+            "43: the ID card definition is not version 2 without the card details field");
         await _k.ActAsync(_k.Requester, joining, RequestAction.Cancel, "Probe check finished");
 
         var oldCard = await _k.ScalarAsync<long>("SELECT id FROM id_cards WHERE employee_id = @Demo AND status = 'Active'", new { Demo = _demo });
         var id = await _k.CreateAsync(_k.Requester, "id-card",
-            new { requestType = "Replacement", details = "Priya Nair, Analyst", reason = "Lost on a trip", oldCardStatus = "Lost" });
+            new { requestType = "Replacement", reason = "Lost on a trip", oldCardStatus = "Lost" });
         await _k.ExpectRefusedAsync("43: Admin doing the HR verification", _k.Admin, id, () => _k.ActAsync(_k.Admin, id, RequestAction.Approve));
         await DoAsync(_k.Hr, id, "hr-verification", RequestAction.Approve);
         await _k.ExpectFieldAsync("43: printing without a card number", "newCardNumber", () => _k.ActAsync(_k.Admin, id, RequestAction.Complete));
