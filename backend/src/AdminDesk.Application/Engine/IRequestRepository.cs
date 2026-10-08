@@ -32,6 +32,9 @@ public sealed record RequestSnapshot
     public long? ParentRequestId { get; init; }
     public long RowVersion { get; init; }
     public DateTime? ClosedUtc { get; init; }
+
+    // The module limits as they stood when the request was created; null for older requests.
+    public string? LimitsJson { get; init; }
 }
 
 public sealed record RequestStepRow

@@ -96,7 +96,8 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
 
         var today = IndiaTime.Today(_clock);
         var normalised = await _validator.ValidateAsync(definition, command.Common, today, command.Payload, ct);
-        var limits = await LoadLimitsAsync(definition.Code, ct);
+        var limitRows = await _limits.ListForModuleAsync(definition.Code, ct);
+        var limits = ToLimitSet(limitRows);
 
         var values = new FieldValues(normalised);
         var advanced = Advance(definition, StepPlanner.PlanInitial(definition), values, limits, requester);
@@ -133,6 +134,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
                 ResponsibleRole = advanced.ResponsibleRole,
                 Remarks = remarks,
                 PayloadJson = JsonSerializer.Serialize(normalised),
+                LimitsJson = JsonSerializer.Serialize(limitRows.Select(r => new StoredLimitEntry(r.StepKey, r.LimitKey, r.ValueMinor, r.Unit))),
                 RowVersion = 1,
                 ClosedUtc = advanced.Finished ? now : null
             };
@@ -203,11 +205,21 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
         return issued;
     }
 
-    private async Task<LimitSet> LoadLimitsAsync(string moduleCode, CancellationToken ct)
+    // Limits as they stood when the request was created; older requests without a snapshot use the live rows.
+    private async Task<LimitSet> LoadLimitsAsync(RequestSnapshot request, string moduleCode, CancellationToken ct)
     {
-        var rows = await _limits.ListForModuleAsync(moduleCode, ct);
-        return new LimitSet(rows.Select(r => new LimitEntry(r.StepKey, r.LimitKey, r.ValueMinor, r.Unit)));
+        if (!string.IsNullOrWhiteSpace(request.LimitsJson))
+        {
+            var stored = JsonSerializer.Deserialize<List<StoredLimitEntry>>(request.LimitsJson) ?? [];
+            return new LimitSet(stored.Select(e => new LimitEntry(e.StepKey, e.LimitKey, e.ValueMinor, e.Unit)));
+        }
+        return ToLimitSet(await _limits.ListForModuleAsync(moduleCode, ct));
     }
+
+    private static LimitSet ToLimitSet(IEnumerable<LimitRow> rows) =>
+        new(rows.Select(r => new LimitEntry(r.StepKey, r.LimitKey, r.ValueMinor, r.Unit)));
+
+    private sealed record StoredLimitEntry(string StepKey, string LimitKey, long ValueMinor, string? Unit);
 
     // ------------------------------------------------------------------- act
 
@@ -386,7 +398,7 @@ public sealed class RequestWorkflowService : IRequestWorkflowService
 
         var managerId = await _employees.GetReportingManagerIdAsync(request.RequesterEmployeeId, ct);
         var requester = new RequesterInfo(request.RequesterEmployeeId, managerId is { } m ? (int)m : null);
-        var limits = await LoadLimitsAsync(definition.Code, ct);
+        var limits = await LoadLimitsAsync(request, definition.Code, ct);
         var values = BuildValues(definition, request.PayloadJson, rows);
         var advanced = Advance(definition, rows.Select(ToPlanned).ToList(), values, limits, requester);
 

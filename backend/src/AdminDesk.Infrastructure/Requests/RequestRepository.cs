@@ -15,7 +15,7 @@ public sealed class RequestRepository : IRequestRepository
         "r.department_id, r.project_id, r.location_id, r.cost_centre_id, r.request_date, r.required_date, " +
         "r.priority, r.subject, r.approval_status, r.current_status, r.current_step_key, r.current_step_seq, " +
         "r.responsible_employee_id, r.responsible_role, r.remarks, r.payload_json, r.amount_minor, " +
-        "r.parent_request_id, r.row_version, r.closed_utc";
+        "r.parent_request_id, r.row_version, r.closed_utc, r.limits_json";
 
     private const string StepColumns =
         "s.id, s.request_id, s.seq, s.step_key, s.name, s.step_type, s.state, s.activated_utc, s.due_utc, " +
@@ -65,17 +65,18 @@ public sealed class RequestRepository : IRequestRepository
         p.Add("AmountMinor", null);
         p.Add("ParentRequestId", null);
         p.Add("ClosedUtc", request.ClosedUtc);
+        p.Add("LimitsJson", request.LimitsJson);
 
         var sql = _dialect.InsertReturningId(
             "INSERT INTO requests (request_no, module_code, definition_id, definition_version, requester_employee_id, " +
             "department_id, project_id, location_id, cost_centre_id, request_date, required_date, priority, subject, " +
             "approval_status, current_status, current_step_key, current_step_seq, responsible_employee_id, " +
-            "responsible_role, remarks, payload_json, amount_minor, parent_request_id, closed_utc, " +
+            "responsible_role, remarks, payload_json, amount_minor, parent_request_id, closed_utc, limits_json, " +
             AuditSql.InsertColumns + ") VALUES (" +
             "@RequestNo, @ModuleCode, @DefinitionId, @DefinitionVersion, @RequesterEmployeeId, " +
             "@DepartmentId, @ProjectId, @LocationId, @CostCentreId, @RequestDate, @RequiredDate, @Priority, @Subject, " +
             "@ApprovalStatus, @CurrentStatus, @CurrentStepKey, @CurrentStepSeq, @ResponsibleEmployeeId, " +
-            "@ResponsibleRole, @Remarks, @PayloadJson, @AmountMinor, @ParentRequestId, @ClosedUtc, " +
+            "@ResponsibleRole, @Remarks, @PayloadJson, @AmountMinor, @ParentRequestId, @ClosedUtc, @LimitsJson, " +
             AuditSql.InsertValues + ")");
         return await tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(sql, p, tx, cancellationToken: ct));
     }
