@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Location } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ButtonDirective } from 'primeng/button';
 
@@ -8,6 +9,7 @@ import { RequestsApi } from '../../core/api/requests.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { BadgeCountsService } from '../../core/state/badge-counts.service';
 import { ROUTE_PATHS } from '../../core/constants/routes';
+import { NavigationHistoryService } from '../../core/navigation/navigation-history.service';
 import { ActionDialogComponent, DialogAction, RequestActionRunner } from '../../shared/action-dialog/action-dialog.component';
 import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.component';
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.component';
@@ -108,7 +110,7 @@ import { StatusPanelComponent } from './status-panel.component';
       </div>
     } @else if (detail(); as d) {
       <header class="header">
-        <a class="back" [routerLink]="['/', mineRoute]">Back</a>
+        <a class="back" [routerLink]="['/', mineRoute]" (click)="onBack($event)">Back</a>
         <div class="title-row">
           <h1 class="text-heading">{{ d.requestNo }}</h1>
           <app-status-badge [status]="d.currentStatus" />
@@ -150,6 +152,8 @@ export class RequestDetailPage implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly runner = inject(RequestActionRunner);
   private readonly badges = inject(BadgeCountsService);
+  private readonly location = inject(Location);
+  private readonly navigationHistory = inject(NavigationHistoryService);
 
   protected readonly mineRoute = ROUTE_PATHS.MyRequests;
   protected readonly detail = signal<RequestDetail | null>(null);
@@ -225,6 +229,13 @@ export class RequestDetailPage implements OnInit {
 
   private captureFieldsOf(d: RequestDetail): FieldDto[] {
     return d.steps.find((s) => s.isCurrent)?.captureFields ?? [];
+  }
+
+  /** Goes back to the page the user came from; without one the link goes to My requests. */
+  protected onBack(event: Event): void {
+    if (!this.navigationHistory.canGoBack()) return;
+    event.preventDefault();
+    this.location.back();
   }
 
   protected goToMine(): void {
