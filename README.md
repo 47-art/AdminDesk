@@ -161,4 +161,4 @@ Not built yet:
 
 ## Checks
 
-`scripts/smoke.sh` walks both processes over HTTP as the demo roles against a running API with a fresh database (`API_URL` selects the address). `node scripts/check-field-types.mjs` checks that the form renderer covers every field type.
+`node scripts/check-field-types.mjs` checks that the form renderer covers every field type.
