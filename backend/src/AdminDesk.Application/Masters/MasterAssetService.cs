@@ -132,7 +132,7 @@ public sealed class MasterAssetService : IMasterAssetService
         _actorAccessor.Use(actor.UserId);
         return await _unitOfWork.ExecuteInTransactionAsync(async (_, tx) =>
         {
-            await CheckAssetTagAsync(tx, fields, null, ct);
+            await CheckAssetNumbersAsync(tx, fields, null, ct);
             var id = await _repository.InsertAssetAsync(tx, fields, ct);
             var created = await _repository.GetAssetAsync(tx, id, ct) ?? throw new InvalidOperationException("The asset was not saved.");
             await _repository.AppendHistoryAsync(tx, new HistoryEntry(MasterTypes.Asset, id, MasterEvents.Added, null, null, null, null, null), ct);
@@ -199,7 +199,7 @@ public sealed class MasterAssetService : IMasterAssetService
         return await _unitOfWork.ExecuteInTransactionAsync(async (_, tx) =>
         {
             var before = await _repository.GetAssetAsync(tx, id, ct) ?? throw NotFound();
-            await CheckAssetTagAsync(tx, fields, id, ct);
+            await CheckAssetNumbersAsync(tx, fields, id, ct);
             await _repository.UpdateAssetAsync(tx, id, fields, ct);
             var after = await _repository.GetAssetAsync(tx, id, ct) ?? throw NotFound();
             await _repository.AppendHistoryAsync(tx, new HistoryEntry(MasterTypes.Asset, id, MasterEvents.Edited, null, null, null, null, null), ct);
@@ -343,13 +343,20 @@ public sealed class MasterAssetService : IMasterAssetService
         }
     }
 
-    private async Task CheckAssetTagAsync(System.Data.Common.DbTransaction tx, AssetFields fields, long? exceptId, CancellationToken ct)
+    private async Task CheckAssetNumbersAsync(System.Data.Common.DbTransaction tx, AssetFields fields, long? exceptId, CancellationToken ct)
     {
+        var errors = new List<FieldError>();
         if (await _repository.IsNumberTakenAsync(tx, MasterNumberKind.AssetTag, fields.AssetTag, exceptId, ct))
         {
-            throw new ValidationException(
-                new[] { new FieldError { Field = "assetTag", Message = "This asset tag is already in use." } },
-                "This asset tag is already in use.");
+            errors.Add(new FieldError { Field = "assetTag", Message = "This asset tag is already in use." });
+        }
+        if (await _repository.IsNumberTakenAsync(tx, MasterNumberKind.SerialNumber, fields.SerialNumber, exceptId, ct))
+        {
+            errors.Add(new FieldError { Field = "serialNumber", Message = "This serial number is already in use." });
+        }
+        if (errors.Count > 0)
+        {
+            throw new ValidationException(errors, errors[0].Message);
         }
     }
 

@@ -8,6 +8,7 @@ public enum MasterNumberKind
     SimNumber,
     MobileNumber,
     AssetTag,
+    SerialNumber,
     CardNumber
 }
 

@@ -3,6 +3,7 @@ using AdminDesk.Application.Abstractions.Persistence;
 using AdminDesk.Application.Masters;
 using AdminDesk.Infrastructure.Persistence;
 using AdminDesk.SharedKernel.Constants;
+using AdminDesk.SharedKernel.Exceptions;
 using AdminDesk.SharedKernel.Money;
 using Dapper;
 
@@ -228,12 +229,13 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
             MasterNumberKind.SimNumber => ("sims", "sim_number"),
             MasterNumberKind.MobileNumber => ("sims", "mobile_number"),
             MasterNumberKind.AssetTag => ("assets", "asset_tag"),
+            MasterNumberKind.SerialNumber => ("assets", "serial_number"),
             _ => ("id_cards", "card_number")
         };
         var count = await tx.Connection!.ExecuteScalarAsync<int>(new CommandDefinition(
-            "SELECT COUNT(*) FROM " + table + " t WHERE " + _dialect.EqualsIgnoreCase("t." + column, "@Value") +
+            "SELECT COUNT(*) FROM " + table + " t WHERE " + _dialect.EqualsIgnoreCase("TRIM(t." + column + ")", "@Value") +
             " AND (@Except IS NULL OR t.id <> @Except)",
-            new { Value = value, Except = exceptId }, tx, cancellationToken: ct));
+            new { Value = value.Trim(), Except = exceptId }, tx, cancellationToken: ct));
         return count > 0;
     }
 
@@ -244,6 +246,31 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
 
     // ----------------------------------------------------- owner maintenance
 
+    // Two saves at the same moment can both pass the in-use check; the database then refuses the second
+    // one, and that is reported as the same field message as the check.
+    private async Task<T> Guard<T>(Func<Task<T>> write)
+    {
+        try
+        {
+            return await write();
+        }
+        catch (Exception exception) when (_dialect.IsUniqueViolation(exception))
+        {
+            throw DuplicateNumber(exception.Message);
+        }
+    }
+
+    private static ValidationException DuplicateNumber(string detail)
+    {
+        var (field, message) =
+            detail.Contains("mobile_number", StringComparison.OrdinalIgnoreCase) ? ("mobileNumber", "This mobile number is already in use.")
+            : detail.Contains("sim_number", StringComparison.OrdinalIgnoreCase) ? ("simNumber", "This SIM number is already in use.")
+            : detail.Contains("serial_number", StringComparison.OrdinalIgnoreCase) ? ("serialNumber", "This serial number is already in use.")
+            : detail.Contains("asset_tag", StringComparison.OrdinalIgnoreCase) ? ("assetTag", "This asset tag is already in use.")
+            : ("cardNumber", "This card number is already in use.");
+        return new ValidationException(field, message);
+    }
+
     public Task<long> InsertSimAsync(DbTransaction tx, SimFields f, CancellationToken ct)
     {
         var p = new DynamicParameters(_stamper.ForCreate());
@@ -253,11 +280,11 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         p.Add("Plan", f.Plan);
         p.Add("Cost", f.MonthlyCostMinor);
         p.Add("Status", SimStatuses.Available);
-        return tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(
+        return Guard(() => tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(
             _dialect.InsertReturningId(
                 "INSERT INTO sims(sim_number, mobile_number, telecom_operator, plan, status, monthly_cost_minor, " + AuditSql.InsertColumns + ") " +
                 "VALUES(@SimNumber, @MobileNumber, @TelecomOperator, @Plan, @Status, @Cost, " + AuditSql.InsertValues + ")"),
-            p, tx, cancellationToken: ct));
+            p, tx, cancellationToken: ct)));
     }
 
     public Task<long> InsertAssetAsync(DbTransaction tx, AssetFields f, CancellationToken ct)
@@ -268,11 +295,11 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         p.Add("MakeModel", f.MakeModel);
         p.Add("Serial", f.SerialNumber);
         p.Add("Status", AssetStatuses.Available);
-        return tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(
+        return Guard(() => tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(
             _dialect.InsertReturningId(
                 "INSERT INTO assets(asset_tag, asset_type, make_model, serial_number, status, " + AuditSql.InsertColumns + ") " +
                 "VALUES(@Tag, @Type, @MakeModel, @Serial, @Status, " + AuditSql.InsertValues + ")"),
-            p, tx, cancellationToken: ct));
+            p, tx, cancellationToken: ct)));
     }
 
     public Task<long> InsertIdCardAsync(DbTransaction tx, string cardNumber, long employeeId, DateOnly issuedDate, CancellationToken ct)
@@ -282,11 +309,11 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         p.Add("EmployeeId", employeeId);
         p.Add("Issued", issuedDate);
         p.Add("Status", IdCardStatuses.Active);
-        return tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(
+        return Guard(() => tx.Connection!.ExecuteScalarAsync<long>(new CommandDefinition(
             _dialect.InsertReturningId(
                 "INSERT INTO id_cards(card_number, employee_id, status, issued_date, " + AuditSql.InsertColumns + ") " +
                 "VALUES(@Number, @EmployeeId, @Status, @Issued, " + AuditSql.InsertValues + ")"),
-            p, tx, cancellationToken: ct));
+            p, tx, cancellationToken: ct)));
     }
 
     public Task UpdateSimAsync(DbTransaction tx, long id, SimFields f, CancellationToken ct)
@@ -298,10 +325,10 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         p.Add("TelecomOperator", f.TelecomOperator);
         p.Add("Plan", f.Plan);
         p.Add("Cost", f.MonthlyCostMinor);
-        return tx.Connection!.ExecuteAsync(new CommandDefinition(
+        return Guard(() => tx.Connection!.ExecuteAsync(new CommandDefinition(
             "UPDATE sims SET sim_number = @SimNumber, mobile_number = @MobileNumber, telecom_operator = @TelecomOperator, " +
             "plan = @Plan, monthly_cost_minor = @Cost, " + AuditSql.UpdateSet + " WHERE id = @Id AND " + AuditSql.Active("sims"),
-            p, tx, cancellationToken: ct));
+            p, tx, cancellationToken: ct)));
     }
 
     public Task UpdateAssetAsync(DbTransaction tx, long id, AssetFields f, CancellationToken ct)
@@ -312,10 +339,10 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         p.Add("Type", f.AssetType);
         p.Add("MakeModel", f.MakeModel);
         p.Add("Serial", f.SerialNumber);
-        return tx.Connection!.ExecuteAsync(new CommandDefinition(
+        return Guard(() => tx.Connection!.ExecuteAsync(new CommandDefinition(
             "UPDATE assets SET asset_tag = @Tag, asset_type = @Type, make_model = @MakeModel, serial_number = @Serial, " +
             AuditSql.UpdateSet + " WHERE id = @Id AND " + AuditSql.Active("assets"),
-            p, tx, cancellationToken: ct));
+            p, tx, cancellationToken: ct)));
     }
 
     public Task UpdateIdCardAsync(DbTransaction tx, long id, IdCardFields f, CancellationToken ct)
@@ -324,10 +351,10 @@ public sealed class MasterAssetRepository : IMasterAssetRepository
         p.Add("Id", id);
         p.Add("Number", f.CardNumber);
         p.Add("Issued", f.IssuedDate);
-        return tx.Connection!.ExecuteAsync(new CommandDefinition(
+        return Guard(() => tx.Connection!.ExecuteAsync(new CommandDefinition(
             "UPDATE id_cards SET card_number = @Number, issued_date = @Issued, " + AuditSql.UpdateSet +
             " WHERE id = @Id AND " + AuditSql.Active("id_cards"),
-            p, tx, cancellationToken: ct));
+            p, tx, cancellationToken: ct)));
     }
 
     public async Task<bool> RetireAsync(DbTransaction tx, string masterType, long id, CancellationToken ct)

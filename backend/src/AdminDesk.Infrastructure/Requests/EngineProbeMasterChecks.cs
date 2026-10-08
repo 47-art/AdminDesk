@@ -473,6 +473,32 @@ internal sealed class EngineProbeMasterChecks
         var dupeTag = await _k.ExpectAsync<ValidationException>("38: a repeated asset tag", () => _service.AddAssetAsync(_k.It, Asset("PRB-AST-1"), ct));
         _k.Check(dupeTag.FieldErrors.Any(e => e.Field == "assetTag"), "38: the repeated asset tag is not keyed to assetTag");
 
+        // Padding and letter case do not make a number new; the serial number is unique too.
+        var dupePadded = await _k.ExpectAsync<ValidationException>("38: a padded asset tag", () => _service.AddAssetAsync(_k.It, Asset("  prb-ast-1 "), ct));
+        _k.Check(dupePadded.FieldErrors.Any(e => e.Field == "assetTag"), "38: the padded asset tag is not keyed to assetTag");
+        var dupeSerial = await _k.ExpectAsync<ValidationException>("38: a repeated serial number", () => _service.AddAssetAsync(_k.It,
+            new AssetFieldsBody { AssetTag = "PRB-AST-NEW", AssetType = "Laptop", MakeModel = "Probe Model", SerialNumber = " prb-prb-ast-1" }, ct));
+        _k.Check(dupeSerial.FieldErrors.Any(e => e.Field == "serialNumber" && e.Message == "This serial number is already in use."),
+            "38: the repeated serial number is not keyed to serialNumber");
+        var dupeMobilePadded = await _k.ExpectAsync<ValidationException>("38: a padded mobile number", () => _service.AddSimAsync(_k.Admin, Sim("PRB-SIM-3", " 9100000001 "), ct));
+        _k.Check(dupeMobilePadded.FieldErrors.Any(e => e.Field == "mobileNumber"), "38: the padded mobile number is not keyed to mobileNumber");
+        var storedTag = await _k.ScalarAsync<string>("SELECT asset_tag FROM assets WHERE id = @Id", new { Id = assetIt.Id });
+        _k.Check(storedTag == storedTag.Trim(), "38: a stored asset tag keeps its padding");
+
+        // A save that slips past the checks is refused by the database and still reads as a field message.
+        var raced = await _k.ExpectAsync<ValidationException>("38: a duplicate that reaches the database", async () =>
+        {
+            await SandboxAsync(async (connection, tx) => await _repository.InsertAssetAsync(
+                tx, new AssetFields("PRB-AST-RACE", "Laptop", "Probe Model", "PRB-PRB-AST-1"), ct), ct);
+        });
+        _k.Check(raced.FieldErrors.Any(e => e.Field == "serialNumber"), "38: a database-level duplicate serial number is not keyed to serialNumber");
+        var racedSim = await _k.ExpectAsync<ValidationException>("38: a duplicate SIM that reaches the database", async () =>
+        {
+            await SandboxAsync(async (connection, tx) => await _repository.InsertSimAsync(
+                tx, new SimFields("PRB-SIM-RACE", "9100000001", "Jio", "Probe 199", 19900), ct), ct);
+        });
+        _k.Check(racedSim.FieldErrors.Any(e => e.Field == "mobileNumber"), "38: a database-level duplicate mobile number is not keyed to mobileNumber");
+
         // A new available record is offered, a retired one is not.
         var offered = await _k.Lookups.Find(MasterLookupKinds.AvailableSim)!.SearchAsync("PRB-SIM-1", 10, ct);
         _k.Check(offered.Any(i => i.Id == simAdmin.Id), "38: a new SIM is not offered by the lookup");

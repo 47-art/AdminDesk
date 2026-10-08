@@ -25,6 +25,10 @@ public sealed partial class SqliteDialect : ISqlDialect
 
     public string EqualsIgnoreCase(string column, string param) => $"{column} = {param} COLLATE NOCASE";
 
+    // SQLITE_CONSTRAINT with a unique or primary key extended code.
+    public bool IsUniqueViolation(Exception exception) =>
+        exception is Microsoft.Data.Sqlite.SqliteException { SqliteErrorCode: 19, SqliteExtendedErrorCode: 2067 or 1555 };
+
     public string InsertReturningId(string insertSql) => insertSql + " RETURNING id";
 
     public string NowUtc => "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";

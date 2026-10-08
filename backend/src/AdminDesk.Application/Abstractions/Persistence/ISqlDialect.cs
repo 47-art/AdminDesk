@@ -21,6 +21,9 @@ public interface ISqlDialect
     // Equality of a column and a parameter ignoring letter case.
     string EqualsIgnoreCase(string column, string param);
 
+    // True when the exception is a unique-constraint violation raised by the database.
+    bool IsUniqueViolation(Exception exception);
+
     // Adds the clause that makes an INSERT statement return the new row's integer id.
     string InsertReturningId(string insertSql);
 
