@@ -236,6 +236,37 @@ main_mode() {
     assert_match "stamp: demo user ids found in the database" "$EMP_USER $MGR_USER" '^[0-9A-Fa-f-]{20,} [0-9A-Fa-f-]{20,}$'
   fi
 
+  # ------------------------------------------------- role policies and demo data
+  call GET /api/team "$T_EMP"
+  assert_status "role policy: employee gets 403 on the team directory" 403
+  for t in "$T_EMP" "$T_MGR" "$T_ADM" "$T_STORE" "$T_SYS" "$T_HR" "$T_SEC"; do
+    for route in /api/masters/employees /api/settings/limits /hangfire; do
+      call GET "$route" "$t"
+      assert_status "not built: $route answers 404" 404
+    done
+  done
+
+  call GET /api/config/public
+  assert_eq "demo data: ten demo accounts are listed" "$(jget d.data.demoAccounts.length)" 10
+
+  call GET "/api/requests/inbox?page=1&pageSize=100" "$T_MGR"
+  assert_true "demo data: the manager's inbox has at least 3 requests" "$(jget 'd.data.total >= 3')"
+
+  call GET "/api/requests/inbox?page=1&pageSize=100" "$T_EMP"
+  assert_true "demo data: the employee has a receipt confirmation waiting"     "$(jget 'd.data.items.some(i => i.primaryActionLabel === "Confirm I received the items")')"
+
+  call GET "/api/requests/mine?status=Cancelled&page=1&pageSize=100" "$T_EMP"
+  CANCELLED_ID=$(jget 'd.data.items.length > 0 ? d.data.items[0].id : null')
+  assert_match "demo data: the employee has a cancelled request" "$CANCELLED_ID" '^[0-9]+$'
+  detail "$CANCELLED_ID" "$T_EMP"
+  assert_true "demo data: the cancelled request carries its reason"     "$(jget 'typeof d.data.cancelReason === "string" && d.data.cancelReason.trim().length > 0')"
+
+  call GET "/api/requests/mine?approvalStatus=Approved&page=1&pageSize=100" "$T_EMP"
+  assert_true "demo data: approved requests are listed for the employee" "$(jget 'd.data.total >= 1')"
+
+  call GET "/api/requests/inbox?page=1&pageSize=100" "$T_ADM"
+  assert_true "demo data: the admin has a courier selection waiting that asks for the company"     "$(jget 'd.data.items.some(i => i.moduleCode === "courier" && i.currentStepName === "Courier selection" && i.captureFields.some(f => f.key === "courierCompany"))')"
+
   # ------------------------------------------------- walk 1: stationery
   create "$T_EMP" "$(stn_body 'A4 paper' 5 'Please deliver to desk 12')"
   R1=$RID; N1=$RNO
