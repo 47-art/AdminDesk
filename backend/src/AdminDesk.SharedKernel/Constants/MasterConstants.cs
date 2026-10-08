@@ -93,6 +93,7 @@ public static class MasterModules
 
     public const string SimField = "sim";
     public const string AssetField = "asset";
+    public const string AssetTypeField = "assetType";
     public const string RequestTypeField = "requestType";
     public const string ReasonField = "reason";
     public const string TransferToField = "transferTo";
@@ -105,6 +106,31 @@ public static class MasterModules
 
     public const string ReasonTransfer = "Transfer";
     public const string RequestTypeReplacement = "Replacement";
+}
+
+// Asset types an asset can have, and the choice the laptop request offers for anything that is neither.
+public static class AssetTypes
+{
+    public const string Laptop = "Laptop";
+    public const string Desktop = "Desktop";
+    public const string OtherRequest = "Other IT asset";
+
+    // Whether an asset of type actual may be given to a request for requested: a laptop request gets a laptop,
+    // a desktop request a desktop, and "other" any asset that is neither.
+    public static bool Matches(string requested, string actual) => requested switch
+    {
+        Laptop or Desktop => string.Equals(requested, actual, StringComparison.OrdinalIgnoreCase),
+        OtherRequest => !string.Equals(actual, Laptop, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(actual, Desktop, StringComparison.OrdinalIgnoreCase),
+        _ => true
+    };
+
+    public static string Refusal(string requested) => requested switch
+    {
+        Laptop => "This request asks for a laptop; choose a laptop.",
+        Desktop => "This request asks for a desktop; choose a desktop.",
+        _ => "This request asks for an IT asset other than a laptop or desktop; choose one."
+    };
 }
 
 public static class MasterLookupKinds

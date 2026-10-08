@@ -294,7 +294,13 @@ internal sealed class EngineProbeModuleChecks
         await StepStateAsync(id, "finance-approval", "NotRequired", "41: a laptop with no cost");
         await DoAsync(_k.It, id, "asset-availability", RequestAction.Complete);
 
-        var asset = await FirstAvailableAsync(MasterLookupKinds.AvailableAsset);
+        var asset = await _k.ScalarAsync<long>(
+            "SELECT MIN(id) FROM assets WHERE status = 'Available' AND is_active = 1 AND asset_type = @Type", new { Type = AssetTypes.Laptop });
+        var headset = await _k.ScalarAsync<long>(
+            "SELECT MIN(id) FROM assets WHERE status = 'Available' AND is_active = 1 AND asset_type NOT IN (@Laptop, @Desktop)",
+            new { Laptop = AssetTypes.Laptop, Desktop = AssetTypes.Desktop });
+        await _k.ExpectFieldAsync("41: a headset for a laptop request", "asset", () => _k.ActAsync(_k.It, id, RequestAction.Complete, null, new() { ["asset"] = J(headset) }));
+        await AssetTypeMatchingAsync(asset, headset, ct);
         await _k.ExpectRefusedAsync("41: Store allocating an asset", _k.Store, id, () => _k.ActAsync(_k.Store, id, RequestAction.Complete, null, new() { ["asset"] = J(asset) }));
         var held = await _k.ScalarAsync<long>("SELECT id FROM assets WHERE status = 'Allocated' ORDER BY id LIMIT 1");
         await _k.ExpectFieldAsync("41: allocating an asset that is held", "asset", () => _k.ActAsync(_k.It, id, RequestAction.Complete, null, new() { ["asset"] = J(held) }));
@@ -311,6 +317,38 @@ internal sealed class EngineProbeModuleChecks
         _k.Check(history.EventType == MasterEvents.Allocated && history.RequestId == id, $"41: the asset history row is {history.EventType}");
         _k.Check(!await _k.Lookups.ExistsAsync(MasterLookupKinds.AvailableAsset, asset, ct), "41: the allocated asset is still offered as available");
         return (id, asset);
+    }
+
+    // A request for a desktop or another IT asset gets only an asset of the matching kind.
+    private async Task AssetTypeMatchingAsync(long laptop, long headset, CancellationToken ct)
+    {
+        var unique = Guid.NewGuid().ToString("N")[..8];
+        var desktop = (await _k.Services.GetRequiredService<IMasterAssetService>().AddAssetAsync(_k.Admin, new AssetFieldsBody
+        {
+            AssetTag = "PRB-DSK-" + unique, AssetType = AssetTypes.Desktop, MakeModel = "Probe Desktop", SerialNumber = "PRB-SER-" + unique
+        }, ct)).Id;
+
+        async Task<long> AtAllocationAsync(string assetType)
+        {
+            var id = await _k.CreateAsync(_k.Requester, "laptop", new { assetType, requirement = "Matching check" });
+            await DoAsync(_k.Manager, id, "manager-approval", RequestAction.Approve);
+            await DoAsync(_k.It, id, "it-admin-verification", RequestAction.Approve);
+            await DoAsync(_k.It, id, "asset-availability", RequestAction.Complete);
+            return id;
+        }
+
+        var forOther = await AtAllocationAsync(AssetTypes.OtherRequest);
+        await _k.ExpectFieldAsync("41: a laptop for an other IT asset request", "asset", () => _k.ActAsync(_k.It, forOther, RequestAction.Complete, null, new() { ["asset"] = J(laptop) }));
+        await _k.ExpectFieldAsync("41: a desktop for an other IT asset request", "asset", () => _k.ActAsync(_k.It, forOther, RequestAction.Complete, null, new() { ["asset"] = J(desktop) }));
+        await DoAsync(_k.It, forOther, "asset-allocation", RequestAction.Complete, new() { ["asset"] = J(headset) });
+        await _k.ActAsync(_k.Requester, forOther, RequestAction.Cancel, "Probe check finished");
+
+        var forDesktop = await AtAllocationAsync(AssetTypes.Desktop);
+        await _k.ExpectFieldAsync("41: a laptop for a desktop request", "asset", () => _k.ActAsync(_k.It, forDesktop, RequestAction.Complete, null, new() { ["asset"] = J(laptop) }));
+        await _k.ExpectFieldAsync("41: a headset for a desktop request", "asset", () => _k.ActAsync(_k.It, forDesktop, RequestAction.Complete, null, new() { ["asset"] = J(headset) }));
+        await DoAsync(_k.It, forDesktop, "asset-allocation", RequestAction.Complete, new() { ["asset"] = J(desktop) });
+        await _k.ActAsync(_k.Requester, forDesktop, RequestAction.Cancel, "Probe check finished");
+        await _k.Services.GetRequiredService<IMasterAssetService>().RetireAsync(_k.Admin, MasterTypes.Asset, desktop, ct);
     }
 
     private async Task LaptopAndAssetReturnAsync(CancellationToken ct)

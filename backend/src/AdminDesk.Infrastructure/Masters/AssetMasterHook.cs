@@ -94,6 +94,9 @@ public sealed class AssetMasterHook : IRequestHook
             case (MasterModules.SimReturn, MasterModules.SimMasterUpdateStep):
                 await ReturnSimAsync(context, ct);
                 break;
+            case (MasterModules.Laptop, MasterModules.AssetAllocationStep):
+                await CheckAssetTypeAsync(context, info, ct);
+                break;
             case (MasterModules.Laptop, MasterModules.AssetMasterUpdateStep):
                 await AllocateAssetAsync(context, info, ct);
                 break;
@@ -172,6 +175,24 @@ public sealed class AssetMasterHook : IRequestHook
             StringOf(payload, MasterModules.ReasonField)), ct);
         await AuditAsync(context, null, MasterTypes.Sim, before.SimNumber, before.Status, SimStatuses.Available,
             before.HolderEmployeeId, null, ct);
+    }
+
+    // The chosen asset has to be of the type the request asks for.
+    private async Task CheckAssetTypeAsync(HookContext context, StepDoneInfo info, CancellationToken ct)
+    {
+        var payload = JsonDocument.Parse(context.Request.PayloadJson).RootElement;
+        var requested = StringOf(payload, MasterModules.AssetTypeField);
+        var chosen = LongOf(JsonSerializer.SerializeToElement(info.Captured), MasterModules.AssetField);
+        if (requested is null || chosen is not { } assetId)
+        {
+            return;
+        }
+
+        var asset = await _masters.GetAssetAsync(context.Transaction, assetId, ct);
+        if (asset is not null && !AssetTypes.Matches(requested, asset.AssetType))
+        {
+            throw new ValidationException(MasterModules.AssetField, AssetTypes.Refusal(requested));
+        }
     }
 
     private async Task AllocateAssetAsync(HookContext context, StepDoneInfo info, CancellationToken ct)
