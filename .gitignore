@@ -25,3 +25,6 @@ uploads/
 Thumbs.db
 .idea/
 data/
+
+# Built web app copied next to the API for production
+backend/src/AdminDesk.Api/wwwroot/
