@@ -52,8 +52,8 @@ public abstract class MasterItemLookupProvider : ILookupProvider
     public string Kind { get; }
 
     private string Select =>
-        $"SELECT t.id AS Id, t.{_codeColumn} AS Code, {_labelExpression} AS Label, " +
-        (_held ? "e.full_name" : _availableSecondary) + " AS Secondary " +
+        $"SELECT t.id AS Id, t.{_codeColumn} AS Code, COALESCE({_labelExpression}, t.{_codeColumn}, '') AS Label, " +
+        "COALESCE(" + (_held ? "e.full_name" : _availableSecondary) + ", '') AS Secondary " +
         $"FROM {_table} t LEFT JOIN employees e ON e.id = t.holder_employee_id ";
 
     private string Eligible =>
@@ -78,11 +78,13 @@ public abstract class MasterItemLookupProvider : ILookupProvider
         return rows.ToList();
     }
 
+    // Label lookups: an item that was allocated or returned since still has to show its label on a request,
+    // so these two methods do not apply the eligibility filter. Search and ExistsAsync still do.
     public async Task<LookupItem?> GetAsync(long id, CancellationToken ct)
     {
         await using var connection = await _factory.OpenAsync(ct);
         return await connection.QueryFirstOrDefaultAsync<LookupItem>(new CommandDefinition(
-            Select + "WHERE t.id = @Id AND " + Eligible, new { Id = id }, cancellationToken: ct));
+            Select + "WHERE t.id = @Id", new { Id = id }, cancellationToken: ct));
     }
 
     public async Task<IReadOnlyList<LookupItem>> GetManyAsync(IReadOnlyCollection<long> ids, CancellationToken ct)
@@ -93,7 +95,7 @@ public abstract class MasterItemLookupProvider : ILookupProvider
         }
         await using var connection = await _factory.OpenAsync(ct);
         var rows = await connection.QueryAsync<LookupItem>(new CommandDefinition(
-            Select + "WHERE t.id IN @Ids AND " + Eligible, new { Ids = ids.Distinct().ToArray() }, cancellationToken: ct));
+            Select + "WHERE t.id IN @Ids", new { Ids = ids.Distinct().ToArray() }, cancellationToken: ct));
         return rows.ToList();
     }
 
