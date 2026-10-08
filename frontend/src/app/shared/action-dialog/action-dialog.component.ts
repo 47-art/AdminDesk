@@ -72,8 +72,19 @@ const REASON_ERRORS: Record<'Reject' | 'Cancel', string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   styles: `
     :host ::ng-deep .action-dialog {
-      width: 480px;
+      width: 640px;
       max-width: calc(100vw - 16px);
+      max-height: 90vh;
+    }
+    :host ::ng-deep .action-dialog .p-dialog-header {
+      padding: var(--space-lg) var(--space-lg) var(--space-md);
+    }
+    :host ::ng-deep .action-dialog .p-dialog-content {
+      padding: var(--space-sm) var(--space-lg) var(--space-lg);
+      overflow-y: auto;
+    }
+    :host ::ng-deep .action-dialog .p-dialog-footer {
+      padding: var(--space-md) var(--space-lg) var(--space-lg);
     }
     .body {
       margin: 0 0 var(--space-md);
@@ -102,7 +113,7 @@ const REASON_ERRORS: Record<'Reject' | 'Cancel', string> = {
       [draggable]="false"
       [header]="title()"
       styleClass="action-dialog"
-      [style]="{ width: '480px', maxWidth: 'calc(100vw - 16px)' }"
+      [style]="{ width: '640px', maxWidth: 'calc(100vw - 16px)', maxHeight: '90vh' }"
     >
       @if (isReason()) {
         @if (action() === 'Cancel') {
