@@ -26,6 +26,8 @@ export const ROLE_GROUPS = {
   RequestManagers: [ROLES.Manager],
   /** Technical roles: no business menus or list pages; they keep the dashboard, People and request links. */
   TechnicalOnly: [ROLES.SystemAdmin],
+  /** Roles that only read documents; they never upload or remove. */
+  ReadOnlyOnDocuments: [ROLES.Management, ROLES.SystemAdmin],
   /** Mirrors the server list of roles that may reject any request; keep the two in step. */
   RequestOverride: [ROLES.Admin],
 } as const satisfies Record<string, readonly Role[]>;

@@ -16,6 +16,7 @@ import { PageSkeletonComponent } from '../../shared/page-skeleton/page-skeleton.
 import { StatusBadgeComponent } from '../../shared/status-badge/status-badge.component';
 import { AuditTrailDrawerComponent } from './audit-trail-drawer.component';
 import { DetailsCardComponent } from './details-card.component';
+import { DocumentsPanelComponent } from './documents-panel.component';
 import { StatusPanelComponent } from './status-panel.component';
 
 /** One page for every request, whatever its module. */
@@ -27,6 +28,7 @@ import { StatusPanelComponent } from './status-panel.component';
     PageSkeletonComponent,
     StatusBadgeComponent,
     DetailsCardComponent,
+    DocumentsPanelComponent,
     StatusPanelComponent,
     AuditTrailDrawerComponent,
     ActionDialogComponent,
@@ -74,9 +76,6 @@ import { StatusPanelComponent } from './status-panel.component';
     .side {
       position: sticky;
       top: 72px;
-    }
-    .documents-slot {
-      display: none;
     }
     .centered {
       display: flex;
@@ -127,7 +126,7 @@ import { StatusPanelComponent } from './status-panel.component';
       <div class="layout">
         <div class="main">
           <app-details-card [detail]="d" />
-          <div class="documents-slot" aria-hidden="true"></div>
+          <app-documents-panel [detail]="d" (changed)="reload()" />
         </div>
         <aside class="side" aria-label="Status and timeline">
           <app-status-panel [detail]="d" [busy]="busy()" (action)="onAction(d, $event)" />
