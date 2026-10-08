@@ -139,6 +139,7 @@ const FILTER_ABOVE_OPTIONS = 8;
   `,
   template: `
     <ng-template #fieldTpl let-field>
+      @if (isShown(field)) {
       <div class="field" [class.span2]="spansBoth(field)">
         <div class="label-row">
           <label [for]="domId(field)"
@@ -268,6 +269,7 @@ const FILTER_ABOVE_OPTIONS = 8;
         }
         <app-field-error [id]="domId(field) + '-error'" [message]="messageFor(field)" />
       </div>
+      }
     </ng-template>
 
     @if (isCapture()) {
@@ -346,6 +348,7 @@ const FILTER_ABOVE_OPTIONS = 8;
         </section>
       }
       @for (section of sections(); track section.title) {
+        @if (sectionShown(section)) {
         <section class="section">
           <h3 class="section-title">{{ section.title }}</h3>
           <div class="grid">
@@ -354,6 +357,7 @@ const FILTER_ABOVE_OPTIONS = 8;
             }
           </div>
         </section>
+        }
       }
     }
   `,
@@ -431,6 +435,16 @@ export class DynamicFormComponent {
 
   protected ctl(field: FieldDto): FormControl<unknown> {
     return this.group().controls[field.key];
+  }
+
+  /** A field with a show-when rule is drawn only while its control is enabled. */
+  protected isShown(field: FieldDto): boolean {
+    this.tick();
+    return !field.showWhen || this.ctl(field).enabled;
+  }
+
+  protected sectionShown(section: SectionDto): boolean {
+    return section.fields.some((f) => this.isShown(f));
   }
 
   protected domId(field: FieldDto): string {

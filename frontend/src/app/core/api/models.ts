@@ -85,6 +85,12 @@ export interface FieldOption {
   label: string;
 }
 
+/** The field is asked only while the named field's answer equals this value. */
+export interface ShowWhen {
+  field: string;
+  equals: string;
+}
+
 export interface FieldDto {
   key: string;
   label: string;
@@ -97,6 +103,8 @@ export interface FieldDto {
   fullWidth: boolean;
   options: FieldOption[];
   lookupKind: string | null;
+  /** Absent or null when the field is always asked. */
+  showWhen?: ShowWhen | null;
 }
 
 export interface SectionDto {

@@ -54,13 +54,50 @@ function validatorsFor(field: FieldDto): ValidatorFn[] {
   return list;
 }
 
+/** Same comparison the server makes: trimmed text, ignoring case. A missing answer never matches. */
+function answerEquals(value: unknown, expected: string): boolean {
+  if (value === null || value === undefined || Array.isArray(value) || value instanceof Date) return false;
+  return String(value).trim().toLowerCase() === String(expected).trim().toLowerCase();
+}
+
+/**
+ * Enables or disables each field that has a show-when rule. A hidden field is disabled (so it is not
+ * validated and not sent) and its value is cleared. A field is also hidden while the field it
+ * depends on is hidden.
+ */
+export function applyShowWhen(group: FieldGroup, fields: FieldDto[]): void {
+  const shown = new Map<string, boolean>();
+  for (const field of fields) {
+    const control = group.controls[field.key];
+    const rule = field.showWhen;
+    if (!control || !rule) {
+      shown.set(field.key, true);
+      continue;
+    }
+    const other = group.controls[rule.field];
+    const visible = !!other && shown.get(rule.field) !== false && answerEquals(other.value, rule.equals);
+    shown.set(field.key, visible);
+    if (visible && control.disabled) {
+      control.enable({ emitEvent: false });
+    } else if (!visible && control.enabled) {
+      control.reset(initialValue(field), { emitEvent: false });
+      control.disable({ emitEvent: false });
+    }
+  }
+}
+
 /** One typed control per field, keyed by the field key, with the validators the definition asks for. */
 export function buildGroup(fields: FieldDto[]): FieldGroup {
   const controls: Record<string, FormControl<unknown>> = {};
   for (const field of fields) {
     controls[field.key] = new FormControl<unknown>(initialValue(field), validatorsFor(field));
   }
-  return new FormGroup(controls);
+  const group = new FormGroup(controls);
+  if (fields.some((f) => f.showWhen)) {
+    applyShowWhen(group, fields);
+    group.valueChanges.subscribe(() => applyShowWhen(group, fields));
+  }
+  return group;
 }
 
 /** The fixed fields every request carries. */
@@ -107,6 +144,8 @@ function toWire(field: FieldDto, value: unknown): unknown {
 export function toPayload(group: FieldGroup, fields: FieldDto[]): Record<string, unknown> {
   const payload: Record<string, unknown> = {};
   for (const field of fields) {
+    // A field hidden by its show-when rule is not sent.
+    if (field.showWhen && group.controls[field.key]?.disabled) continue;
     payload[field.key] = toWire(field, group.controls[field.key]?.value);
   }
   return payload;
