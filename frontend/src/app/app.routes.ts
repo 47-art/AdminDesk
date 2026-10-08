@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 
-import { authGuard, employeeProfileGuard, roleGuard } from './core/auth/guards';
+import { authGuard, businessAreaGuard, employeeProfileGuard, roleGuard } from './core/auth/guards';
 import { ROLE_GROUPS } from './core/constants/roles';
 import { ROUTE_PATHS } from './core/constants/routes';
 import { ShellComponent } from './layout/shell.component';
@@ -22,26 +22,27 @@ export const routes: Routes = [
       },
       {
         path: ROUTE_PATHS.Inbox,
+        canActivate: [businessAreaGuard],
         loadChildren: () => import('./features/inbox/inbox.routes').then((m) => m.INBOX_ROUTES),
       },
       {
         path: ROUTE_PATHS.MyRequests,
-        canActivate: [employeeProfileGuard],
+        canActivate: [businessAreaGuard, employeeProfileGuard],
         loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.MY_REQUESTS_ROUTES),
       },
       {
         path: ROUTE_PATHS.AllRequests,
-        canActivate: [roleGuard(ROLE_GROUPS.OrganisationWide)],
+        canActivate: [businessAreaGuard, roleGuard(ROLE_GROUPS.OrganisationWide)],
         loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.ALL_REQUESTS_ROUTES),
       },
       {
         path: ROUTE_PATHS.TeamRequests,
-        canActivate: [roleGuard(ROLE_GROUPS.RequestManagers)],
+        canActivate: [businessAreaGuard, roleGuard(ROLE_GROUPS.RequestManagers)],
         loadChildren: () => import('./features/my-requests/my-requests.routes').then((m) => m.TEAM_REQUESTS_ROUTES),
       },
       {
         path: ROUTE_PATHS.NewRequest,
-        canActivate: [employeeProfileGuard],
+        canActivate: [businessAreaGuard, employeeProfileGuard],
         loadChildren: () => import('./features/new-request/new-request.routes').then((m) => m.NEW_REQUEST_ROUTES),
       },
       {

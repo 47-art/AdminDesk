@@ -5,6 +5,8 @@ import { Skeleton } from 'primeng/skeleton';
 
 import { DashboardSummary } from '../../core/api/models';
 import { RequestsApi } from '../../core/api/requests.api';
+import { AuthService } from '../../core/auth/auth.service';
+import { ROLE_GROUPS } from '../../core/constants/roles';
 import { ROUTE_PATHS } from '../../core/constants/routes';
 import { REQUEST_STATUSES } from '../../core/constants/statuses';
 import { EmptyStateComponent } from '../../shared/empty-state/empty-state.component';
@@ -152,7 +154,7 @@ interface Counter {
           icon="pi-history"
           title="No recent activity yet"
           body="Requests you raise or act on will appear here."
-          actionLabel="Start a request"
+          [actionLabel]="canOpenLists ? 'Start a request' : ''"
           (action)="startRequest()"
         />
       } @else {
@@ -181,6 +183,9 @@ interface Counter {
 export class DashboardPage implements OnInit {
   private readonly api = inject(RequestsApi);
   private readonly router = inject(Router);
+  private readonly auth = inject(AuthService);
+  /** Technical roles have no business list pages, so their counters are plain numbers. */
+  protected readonly canOpenLists = !this.auth.hasAnyRole(ROLE_GROUPS.TechnicalOnly);
 
   protected readonly paths = ROUTE_PATHS;
   protected readonly skeletons = [1, 2, 3, 4, 5, 6, 7];
@@ -203,7 +208,7 @@ export class DashboardPage implements OnInit {
     // Each card opens the list that holds exactly the requests it counts: all requests for the
     // organisation scope, the signed-in person's own otherwise.
     const mine = `/${data.scope === 'Organisation' ? ROUTE_PATHS.AllRequests : ROUTE_PATHS.MyRequests}`;
-    return [
+    const counters: Counter[] = [
       { label: 'Waiting for me', value: data.waitingForMe, link: `/${ROUTE_PATHS.Inbox}`, query: null },
       { label: 'Total', value: data.total, link: mine, query: null },
       { label: 'Pending', value: data.pending, link: mine, query: { status: REQUEST_STATUSES.InProgress, approvalStatus: 'Pending' } },
@@ -212,6 +217,7 @@ export class DashboardPage implements OnInit {
       { label: 'Completed', value: data.completed, link: mine, query: { status: REQUEST_STATUSES.Closed } },
       { label: 'Cancelled', value: data.cancelled, link: mine, query: { status: REQUEST_STATUSES.Cancelled } },
     ];
+    return this.canOpenLists ? counters : counters.map((c) => ({ ...c, link: null, query: null }));
   }
 
   protected relative(value: string): { text: string; exact: string } {
