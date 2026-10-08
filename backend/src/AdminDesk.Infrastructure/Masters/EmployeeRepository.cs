@@ -121,10 +121,22 @@ public sealed class EmployeeRepository : IEmployeeRepository
             "ORDER BY e.full_name, e.id " + _dialect.LimitOffset("@Limit", "@Offset");
 
         await using var connection = await _factory.OpenAsync(ct);
-        var rows = await connection.QueryAsync<LookupItem>(new CommandDefinition(
+        var rows = await connection.QueryAsync<LookupRow>(new CommandDefinition(
             sql,
             new { Q = "%" + _dialect.EscapeLikeValue(q) + "%", Limit = take, Offset = 0 },
             cancellationToken: ct));
-        return rows.ToList();
+        return rows.Select(r => new LookupItem(r.Id, r.Code, r.Label, r.Secondary as string)).ToList();
+    }
+
+    // Computed columns have no declared type, so the text column is read as an object.
+    private sealed class LookupRow
+    {
+        public long Id { get; set; }
+
+        public string Code { get; set; } = string.Empty;
+
+        public string Label { get; set; } = string.Empty;
+
+        public object? Secondary { get; set; }
     }
 }

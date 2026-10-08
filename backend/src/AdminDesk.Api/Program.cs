@@ -176,6 +176,11 @@ try
 
     app.MapControllers();
 
+    // Unknown routes answer 404 for everyone instead of a sign-in challenge.
+    app.MapFallback(() => Results.Json(
+        AdminDesk.SharedKernel.Responses.ApiResponse.Fail(ErrorCodes.NOT_FOUND, "Resource not found."),
+        statusCode: StatusCodes.Status404NotFound)).AllowAnonymous();
+
     foreach (var module in pipelineModules.OrderBy(m => m.Order))
     {
         module.MapEndpoints(app);
