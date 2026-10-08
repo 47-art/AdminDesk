@@ -13,7 +13,7 @@ import { Skeleton } from 'primeng/skeleton';
 import { TableLazyLoadEvent, TableModule } from 'primeng/table';
 import { Tooltip } from 'primeng/tooltip';
 
-import { Observable } from 'rxjs';
+import { Observable, Subscription } from 'rxjs';
 
 import { ApprovalStatus, MineQuery, Paged, RequestListItem, RequestStatus } from '../../core/api/models';
 import { ModulesApi } from '../../core/api/modules.api';
@@ -646,8 +646,9 @@ export class MyRequestsPage implements OnInit {
 
   protected loadMore(): void {
     const next = this.phonePage + 1;
+    this.inFlight?.unsubscribe();
     this.loading.set(true);
-    this.fetch({ ...this.toQuery(this.state()), page: next, pageSize: DEFAULT_PAGE_SIZE }).subscribe({
+    this.inFlight = this.fetch({ ...this.toQuery(this.state()), page: next, pageSize: DEFAULT_PAGE_SIZE }).subscribe({
       next: (result) => {
         this.phonePage = next;
         this.items.update((current) => [...current, ...result.items]);
@@ -705,14 +706,18 @@ export class MyRequestsPage implements OnInit {
     }
   }
 
+  /** The request in flight; a newer one replaces it so an older answer cannot overwrite newer results. */
+  private inFlight?: Subscription;
+
   private load(): void {
+    this.inFlight?.unsubscribe();
     const s = this.state();
     this.loading.set(true);
     this.failed.set(false);
     const phone = this.phone();
     this.phonePage = 1;
     const query = phone ? { ...this.toQuery(s), page: 1, pageSize: DEFAULT_PAGE_SIZE } : this.toQuery(s);
-    this.fetch(query).subscribe({
+    this.inFlight = this.fetch(query).subscribe({
       next: (result) => {
         this.items.set(result.items);
         this.total.set(result.total);

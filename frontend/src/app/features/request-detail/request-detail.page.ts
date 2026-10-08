@@ -168,6 +168,9 @@ export class RequestDetailPage implements OnInit {
   protected readonly dialogCaptureFields = signal<FieldDto[]>([]);
   protected readonly showAudit = computed(() => this.auth.canSeeAudit());
 
+  /** Incremented for every fetch so an older response cannot overwrite a newer one. */
+  private fetchToken = 0;
+
   ngOnInit(): void {
     this.route.paramMap.subscribe(() => this.load());
   }
@@ -182,12 +185,15 @@ export class RequestDetailPage implements OnInit {
     this.loading.set(true);
     this.notFound.set(false);
     this.failed.set(false);
+    const token = ++this.fetchToken;
     this.requests.get(id).subscribe({
       next: (d) => {
+        if (token !== this.fetchToken) return;
         this.detail.set(d);
         this.loading.set(false);
       },
       error: (err: unknown) => {
+        if (token !== this.fetchToken) return;
         this.loading.set(false);
         if (err instanceof ApiError && (err.status === 404 || err.status === 403)) {
           this.notFound.set(true);
@@ -215,16 +221,26 @@ export class RequestDetailPage implements OnInit {
   }
 
   protected afterChange(updated: RequestDetail): void {
+    // A response to an action is newer than any fetch still on its way.
+    this.fetchToken++;
     this.detail.set(updated);
+    this.failed.set(false);
     this.badges.refreshInbox();
   }
 
   protected reload(): void {
     const id = this.detail()?.id;
     if (id === undefined) return;
+    const token = ++this.fetchToken;
     this.requests.get(id).subscribe({
-      next: (d) => this.detail.set(d),
-      error: () => this.failed.set(true),
+      next: (d) => {
+        if (token !== this.fetchToken) return;
+        this.detail.set(d);
+        this.failed.set(false);
+      },
+      error: () => {
+        if (token === this.fetchToken) this.failed.set(true);
+      },
     });
     this.badges.refreshInbox();
   }

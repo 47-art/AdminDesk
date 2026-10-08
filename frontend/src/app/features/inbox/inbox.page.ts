@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, injec
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { ButtonDirective } from 'primeng/button';
 import { Drawer } from 'primeng/drawer';
 import { InputText } from 'primeng/inputtext';
@@ -426,10 +427,14 @@ export class InboxPage implements OnInit {
     this.load();
   }
 
+  /** The request in flight; a newer one replaces it so an older answer cannot overwrite newer results. */
+  private inFlight?: Subscription;
+
   protected load(): void {
+    this.inFlight?.unsubscribe();
     this.loading.set(true);
     this.failed.set(false);
-    this.requestsApi
+    this.inFlight = this.requestsApi
       .inbox({
         page: this.page(),
         pageSize: this.pageSize(),
