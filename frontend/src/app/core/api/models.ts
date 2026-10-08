@@ -105,6 +105,8 @@ export interface FieldDto {
   lookupKind: string | null;
   /** Absent or null when the field is always asked. */
   showWhen?: ShowWhen | null;
+  /** Where the starting value comes from; only 'requesterName' exists. The field stays editable. */
+  defaultFrom?: 'requesterName' | null;
 }
 
 export interface SectionDto {

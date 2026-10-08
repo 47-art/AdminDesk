@@ -2,6 +2,7 @@ import { AbstractControl, FormControl, FormGroup, ValidatorFn, Validators } from
 
 import { CommonFieldsInput, FieldDto, FieldError } from '../../core/api/models';
 import { FIELD_TYPES, PRIORITIES, Priority } from '../../core/constants/field-types';
+import { STORAGE_KEYS } from '../../core/constants/storage-keys';
 import { toDateOnlyString } from '../../shared/formatters/dates';
 
 export type FieldGroup = FormGroup<Record<string, FormControl<unknown>>>;
@@ -30,7 +31,21 @@ export function domIdFor(name: string, group: FieldGroup): string {
     : commonDomId(name);
 }
 
-function initialValue(field: FieldDto): unknown {
+/** Name of the signed-in user, read from the stored session; empty when there is none. */
+function signedInName(): string {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.user);
+    const name = raw ? (JSON.parse(raw) as { name?: unknown }).name : null;
+    return typeof name === 'string' ? name : '';
+  } catch {
+    return '';
+  }
+}
+
+function initialValue(field: FieldDto, requesterName = ''): unknown {
+  if (field.defaultFrom === 'requesterName' && (field.type === FIELD_TYPES.Text || field.type === FIELD_TYPES.LongText)) {
+    return requesterName;
+  }
   switch (field.type) {
     case FIELD_TYPES.YesNo:
       return false;
@@ -87,10 +102,12 @@ export function applyShowWhen(group: FieldGroup, fields: FieldDto[]): void {
 }
 
 /** One typed control per field, keyed by the field key, with the validators the definition asks for. */
-export function buildGroup(fields: FieldDto[]): FieldGroup {
+export function buildGroup(fields: FieldDto[], requesterName?: string): FieldGroup {
   const controls: Record<string, FormControl<unknown>> = {};
+  // A field with a default from the requester starts with the requester's name and can still be edited.
+  const name = fields.some((f) => f.defaultFrom) ? (requesterName ?? signedInName()) : '';
   for (const field of fields) {
-    controls[field.key] = new FormControl<unknown>(initialValue(field), validatorsFor(field));
+    controls[field.key] = new FormControl<unknown>(initialValue(field, name), validatorsFor(field));
   }
   const group = new FormGroup(controls);
   if (fields.some((f) => f.showWhen)) {
