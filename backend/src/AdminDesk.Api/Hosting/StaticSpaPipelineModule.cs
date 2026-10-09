@@ -6,10 +6,14 @@ namespace AdminDesk.Api.Hosting;
 // under /api or /hangfire answers with the app's start page so client-side routing works.
 public sealed class StaticSpaPipelineModule : IPipelineModule
 {
-    // Matches everything except /api, /hangfire and their sub-paths.
-    private const string Pattern = "{*path:regex(^(?!(api|hangfire)(/|$)).*$)}";
+    // Matches everything except /api, /hangfire and their sub-paths, and except paths with a file
+    // extension: those are left to the static file middleware, which skips any request that matched
+    // an endpoint, so a file path matched here would be answered with the start page.
+    private const string Pattern = "{*path:nonfile:regex(^(?!(api|hangfire)(/|$)).*$)}";
 
-    public int Order => 1000;
+    // Below 500 so the static files are served before authentication: the app's default policy asks for a
+    // signed-in user on any request that matches no route, and a file is such a request.
+    public int Order => 400;
 
     public void UseMiddleware(WebApplication app)
     {
