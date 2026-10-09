@@ -4,10 +4,15 @@ AdminDesk is a single-organisation Admin operations platform built around **one 
 
 The central idea: **a process is a definition file, not new application code.** Fields, ordered steps, who acts on each step, conditions and approval limits all live in a JSON file. Adding or changing a process means editing that file. See [docs/definitions.md](docs/definitions.md).
 
-> This is a proof of concept. [What is built](#what-is-built) and [what is not](#not-built) are listed plainly below.
+## Context
+
+This project was built as a **practical assignment for a mid-level engineer position**. The brief was a broad description of an Admin department's processes: about two dozen kinds of request (travel, advances, petty cash, SIMs and assets, ID cards, purchase, vendors, a helpdesk and more) together with a list of system controls such as an audit trail, role-based access, approval limits, service levels and reporting. It described the shape of each flow but left many details open (who approves at some steps, the approval limits, the status values), and it was far larger than could be finished in the time available.
+
+So it was planned as a **proof of concept that favours depth over breadth**. The foundation comes first: one configuration-driven workflow engine, the audit trail, role-based access, and approval limits and conditions that are versioned and editable. On top of it sit a representative set of processes that exercise every part of that foundation: approvals, conditional steps, documents, allocation and return, and masters. Everything else is listed plainly under [Not built](#not-built). Where the brief was silent, a small and reasonable assumption was made and written down under [Assumptions](#assumptions), so a reviewer can see what was decided and why.
 
 ## Contents
 
+- [Context](#context)
 - [What is built](#what-is-built)
 - [Requirements](#requirements)
 - [Run it locally](#run-it-locally)
