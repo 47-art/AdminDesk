@@ -72,6 +72,8 @@ The script restores and builds the backend, installs the frontend packages when 
 - The first start creates the database in `data/`, the sample organisation, the demo users and a spread of demo requests. Delete `data/` to start again from scratch.
 - If the API stops at start with a lock timeout straight after a forced stop, wait two minutes and start it again; the background-job storage releases a lock left by a killed process after that time.
 
+**Optional ready-made data.** `sample-data/app.db` is a freshly seeded database (the sample organisation, the demo users and demo requests at different stages). The app creates and seeds its own database on first start, so you do not need it. To use it instead, stop the app and copy it to `data/app.db` before the first start. The app then applies any newer migrations on top. Do not commit changes to it: runs write to `data/`, which is ignored.
+
 Without the script, in two terminals:
 
 ```

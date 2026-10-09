@@ -15,6 +15,7 @@ dist/
 *.db
 *.db-shm
 *.db-wal
+!sample-data/app.db
 .env
 appsettings.*.local.json
 logs/
