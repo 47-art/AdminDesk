@@ -1,15 +1,63 @@
 # AdminDesk
 
-AdminDesk is a single-organisation Admin operations platform built around one configuration-driven workflow engine. Employees raise requests, the requests flow through approvals and tasks to automatic closure, and every step is recorded in an audit trail. A process is a definition file, not a new application: see [docs/definitions.md](docs/definitions.md).
+AdminDesk is a single-organisation Admin operations platform built around **one configuration-driven workflow engine**. Employees and managers raise requests (stationery, courier, SIM, laptop and IT assets, ID cards, welfare, housekeeping and more). Each request flows through approvals and tasks to automatic closure, every step is recorded in an append-only audit trail, and who can see or do what is enforced on the server by role.
 
-This release ships two processes on the engine, Stationery and Courier, with demo data so the screens are not empty.
+The central idea: **a process is a definition file, not new application code.** Fields, ordered steps, who acts on each step, conditions and approval limits all live in a JSON file. Adding or changing a process means editing that file. See [docs/definitions.md](docs/definitions.md).
 
-## Prerequisites
+> This is a proof of concept. [What is built](#what-is-built) and [what is not](#not-built) are listed plainly below.
 
-- .NET 10 SDK
-- Node 22 with npm
+## Contents
 
-## Quick start
+- [What is built](#what-is-built)
+- [Requirements](#requirements)
+- [Run it locally](#run-it-locally)
+- [Demo accounts and a short tour](#demo-accounts-and-a-short-tour)
+- [Architecture](#architecture)
+- [How the web app and the API talk to each other](#how-the-web-app-and-the-api-talk-to-each-other)
+- [How a module is configured](#how-a-module-is-configured)
+- [The workflow engine](#the-workflow-engine)
+- [Roles and access](#roles-and-access)
+- [Design choices and why](#design-choices-and-why)
+- [Practices followed](#practices-followed)
+- [Configuration](#configuration)
+- [Self-check (engine probe)](#self-check-engine-probe)
+- [Running it as one process](#running-it-as-one-process)
+- [Project layout](#project-layout)
+- [Assumptions](#assumptions)
+- [Not built](#not-built)
+
+## What is built
+
+**The engine**
+- Request IDs generated automatically per module (for example `STN-2026-0001`).
+- Approval steps and task steps, with an approve / reject / complete / cancel model. Reject and cancel need a reason.
+- Conditional steps ("only if the cost is above the limit"), evaluated when the step becomes next, using form values, values captured by earlier steps, and stored limits.
+- Approval limits and step conditions that can be edited in the app, without code changes. Edits apply to new requests only; requests in flight keep the version they started on.
+- A complete, append-only audit trail of every action.
+- Document upload and download on requests, including steps that require a document before they can complete.
+- Optimistic concurrency, so two people acting on the same request cannot overwrite each other.
+
+**The processes (modules)**
+Stationery, Courier (with proof of delivery), SIM and SIM return, Laptop / IT asset and Asset return, ID card, Employee welfare, Housekeeping.
+
+**Around the engine**
+- Masters for SIMs, assets and ID cards: current holder, status and history, updated by the request flows, maintained by the owning roles.
+- Screens: Waiting for me, My requests, Handled by me, All requests, Team requests, People, Masters, Limits and conditions, Module definitions, and dashboards for employees and managers.
+- Ten demo roles and a sample organisation of 200 employees, created automatically on first start.
+
+## Requirements
+
+| Needed | Version |
+|--------|---------|
+| .NET SDK | 10 |
+| Node.js | 22 (with npm) |
+| Git | any recent version |
+
+No database server, container or cloud account is needed. The data lives in SQLite files created on first start.
+
+Works on Windows, Linux and macOS. The one-command start script is PowerShell for Windows, with a bash equivalent for the others.
+
+## Run it locally
 
 ```
 git clone <this repository>
@@ -18,22 +66,22 @@ scripts/dev.ps1        # Windows PowerShell
 scripts/dev.sh         # bash (Git Bash, Linux, macOS)
 ```
 
-The script restores and builds the backend, installs the frontend packages when needed, starts the API on http://localhost:5080 and the web app on http://localhost:4200, and waits. Press Ctrl+C to stop both, or run `scripts/dev.ps1 -Stop` / `scripts/dev.sh stop` from another window.
+The script restores and builds the backend, installs the frontend packages when they are missing, starts the API on http://localhost:5080 and the web app on http://localhost:4200, and waits. Then open **http://localhost:4200**.
 
-If you prefer plain commands, in two terminals:
+- Stop both with Ctrl+C, or run `scripts/dev.ps1 -Stop` (`scripts/dev.sh stop`) from another window.
+- The first start creates the database in `data/`, the sample organisation, the demo users and a spread of demo requests. Delete `data/` to start again from scratch.
+- If the API stops at start with a lock timeout straight after a forced stop, wait two minutes and start it again; the background-job storage releases a lock left by a killed process after that time.
+
+Without the script, in two terminals:
 
 ```
 dotnet run --project backend/src/AdminDesk.Api
 cd frontend && npm start
 ```
 
-Then open http://localhost:4200. The first start creates the database in `data/`, the sample organisation (200 employees), the demo users and a spread of demo requests.
+## Demo accounts and a short tour
 
-If the API stops at start with a lock timeout straight after a forced stop, wait two minutes and start it again; the background-job storage releases a lock left by the killed process after that time.
-
-## Demo accounts
-
-The login screen shows one card per role; clicking a card signs you in at once. All accounts share the practice password `Demo@12345`. It is a fake password for local demo data and must never be used for a real deployment.
+The sign-in screen shows one card per role; clicking a card signs you in. All accounts share the practice password `Demo@12345`, a fake password for demo data that must never be used in a real deployment.
 
 | Role | Name | Email |
 |------|------|-------|
@@ -48,118 +96,266 @@ The login screen shows one card per role; clicking a card signs you in at once. 
 | Manager | Rohan Kapoor | manager@demo.test |
 | Employee | Priya Nair | employee@demo.test |
 
-## Walkthrough
+**Stationery, from submission to closure**
+1. As the Employee: New request, Stationery, fill in an item and quantity, submit.
+2. As the Manager: approve it from Waiting for me.
+3. As Admin or Store: approve the verification step.
+4. As Store: confirm stock is available, then mark the items issued.
+5. As the Employee: confirm you received them.
+6. As Store: confirm the stock update. The request closes by itself.
+7. As Admin: open the closed request and read the Audit trail at the bottom.
 
-Stationery, from submission to closure:
+**A conditional step.** As the Employee raise a Laptop request with a cost, then as the Manager and IT approve it. The Finance step appears only because the cost is above the Finance limit. As Management, open Limits and conditions, raise the limit above that cost, and raise another request: the Finance step is now skipped.
 
-1. Click the Employee card, choose New request, then Stationery, fill in an item and a quantity and submit.
-2. Sign in as the Manager and approve the request from Waiting for me.
-3. As Admin or Store, approve the verification step.
-4. As Store, confirm that stock is available, then mark the items as issued.
-5. As the Employee, confirm that you received the items.
-6. As Store, confirm the stock update. The request closes by itself.
-7. As Admin, open the closed request and read the Audit trail section at the bottom of the page.
+**Allocation.** As IT or Admin, allocate an available laptop on a Laptop request, let the Employee acknowledge it, then open Masters and see the holder and history update. Return it with an Asset return request, recording its condition and any damage cost.
 
-Courier: raise a Courier request as the Employee, describing what is being sent in the "What are you sending?" box. As Admin, select the courier (entering the courier company), mark it dispatched and save the tracking number. As the requester, confirm delivery. The request closes and the timeline shows the courier company and the tracking number.
-
-Reject and Cancel both need a reason. Whoever holds an approval step can reject at it, and the Admin can reject at any step, task steps included. Only the requester can cancel, while the request is in progress and until the step that hands over the item is done (Issue material for stationery, Dispatch for courier). After that Cancel is no longer offered to anyone; Reject is never locked.
-
-## How a module is defined
-
-A module is one JSON file: its fields, its steps, who acts on each step and any values a step captures. [docs/definitions.md](docs/definitions.md) describes the format. To try the sample that uses every field type, set `Definitions__OverrideDirectory=scripts/fixtures/fieldtypes` before starting the API (any folder of definition files works the same way; files there are added to the shipped set, or replace a shipped file of the same name).
+**Documents.** Raise a Courier request, walk it to the proof of delivery step as Admin, and note it cannot complete until a document is uploaded.
 
 ## Architecture
 
-- Five backend projects: Api, Application, Domain, Infrastructure and SharedKernel, with the web app in `frontend/`.
-- SQLite with Dapper for data access; the schema is created by numbered DbUp scripts at start. ASP.NET Core Identity (through Entity Framework) holds users, roles and claims only.
-- Angular 21 with PrimeNG for the web app, JWT bearer sign-in.
-- Background jobs: a spike of four checks on SQLite (recurring job, delayed job, restart survival and a ten-minute soak) all passed, so Hangfire stays the default provider; see [docs/hangfire-spike.md](docs/hangfire-spike.md). The jobs dashboard comes with a later release and is not served in this one.
-- A different database is a contained change: [docs/postgresql-path.md](docs/postgresql-path.md).
+```
+ Browser (Angular 21 + PrimeNG)
+        |   HTTPS, JSON, JWT bearer token
+        v
+ ASP.NET Core API  (backend/src/AdminDesk.Api)
+   controllers, authorisation policies, validation filter,
+   exception and correlation-id middleware
+        |
+ Application   (use cases, rules about who may do what)
+   workflow service, query service, documents, masters, limits editor
+        |
+ Domain        (pure engine logic, no I/O)
+   definitions and their validator, step planner, rule evaluator,
+   status deriver, step resolver
+        |
+ Infrastructure (everything that touches the outside world)
+   SQLite + Dapper repositories, DbUp migrations, Identity (EF Core),
+   Hangfire jobs, file storage, logging sink, seeding, request hooks
+        |
+ SQLite files in data/   +   uploaded documents on disk
+```
+
+- **Five backend projects**, each depending only inward: `Api`, `Application`, `Domain`, `Infrastructure`, `SharedKernel` (constants, enums, exceptions, the money type, the response wrapper). The engine rules in `Domain` can be read and reasoned about without a database.
+- **Dapper** for all data access, with SQL behind repository interfaces and a small SQL-dialect layer. **Entity Framework Core is used only for the ASP.NET Core Identity tables** (users, roles, claims).
+- **SQLite** in WAL mode for everything, so a fresh clone runs with nothing to install.
+- **DbUp** applies numbered, embedded SQL scripts at start, so the schema and the module definitions travel with the build.
+- **Hangfire** (with SQLite storage) for background jobs. A short spike confirmed recurring jobs, delayed jobs, restart survival and a ten-minute soak all work on .NET 10; a simple timer-based provider remains available behind the same interface (`Jobs:Provider`).
+- **Serilog** for logging, with warnings and errors also batched into a `logs` table together with the request's correlation id.
+- **Angular 21** (standalone components, signals, lazy-loaded routes) with **PrimeNG 21** and a custom calm-blue theme.
+
+## How the web app and the API talk to each other
+
+1. The browser loads the Angular app. It calls the API with **relative addresses** (`/api/...`), so it works wherever it is hosted.
+2. Sign-in is `POST /api/auth/login`. The API answers with a **JWT** (8-hour lifetime) and the user's roles. The web app keeps it in local storage and an HTTP interceptor adds `Authorization: Bearer ...` to every call.
+3. Every response uses one wrapper: `{ "success": true, "data": ..., "error": null }`, or on failure an error code, a message and per-field messages that the form shows beside the right input. The web app turns that into typed results.
+4. The API never trusts the screen. Every endpoint carries an **authorisation policy**; hiding a button in the web app is never the only control. The web app reads the roles only to decide what to show.
+5. Every response carries an `X-Correlation-ID` header. If something unexpected happens, the screen shows a reference that matches the id stored with the error in the logs.
+6. **In development** the Angular dev server (port 4200) forwards `/api` to the API (port 5080) through its proxy settings. **In production** the API serves the built web app itself, so page and API share one origin and no cross-origin settings are needed. See [Running it as one process](#running-it-as-one-process).
+
+## How a module is configured
+
+A module is **one JSON file** in `definitions/`, compiled into the API as an embedded resource. A simplified example (the shipped `definitions/laptop.json` is the full version):
+
+```json
+{
+  "code": "laptop",
+  "version": 1,
+  "name": "Laptop or IT asset request",
+  "prefix": "LAP",
+  "subject": "{assetType} request",
+  "fields": [
+    { "key": "assetType", "label": "Asset type", "type": "select", "required": true,
+      "options": [ { "value": "Laptop", "label": "Laptop" }, { "value": "Desktop", "label": "Desktop" } ] },
+    { "key": "estimatedCost", "label": "Cost, if a payment is involved", "type": "money", "min": 0 }
+  ],
+  "steps": [
+    { "key": "manager-approval", "name": "Manager approval", "type": "approval", "actor": { "reportingManager": true } },
+    { "key": "it-admin-verification", "name": "IT or Admin verification", "type": "approval", "actor": { "roles": ["IT", "Admin"] } },
+    { "key": "finance-approval", "name": "Finance approval", "type": "approval", "actor": { "roles": ["Finance"] },
+      "condition": { "field": "estimatedCost", "op": "gt", "limit": "finance-limit" } },
+    { "key": "asset-allocation", "name": "Asset allocation", "type": "task", "actor": { "roles": ["IT", "Admin"] },
+      "captureFields": [ { "key": "asset", "label": "Asset to allocate", "type": "lookup", "lookupKind": "availableAsset", "required": true } ] }
+  ],
+  "limits": [ { "stepKey": "finance-approval", "limitKey": "finance-limit", "valueMinor": 0, "unit": "INR" } ]
+}
+```
+
+What a definition can express:
+
+| Part | What it does |
+|------|--------------|
+| `fields` | The request form, rendered by one generic form component. Types: text, long text, number, money, date, date-time, yes/no, select, multi-select and lookups (employee, department, project, location, cost centre, available or held SIM and asset). |
+| `showWhen` | A field appears only when an earlier answer has a given value; hidden values are ignored on the server too. |
+| `requiredCommonFields` | The module insists on common fields (location, project, cost centre) that are optional elsewhere. |
+| `defaultFrom` | A text field starts with a value taken from the signed-in user. |
+| `steps` | The route, in order. An `approval` step can approve or reject; a `task` step is completed, optionally with `captureFields` the actor must enter. |
+| `actor` | The requester's reporting manager, the requester, or anyone holding one of a list of roles. |
+| `condition` | Makes a step conditional on a field, a value captured earlier, or a stored limit. |
+| `requiresDocument`, `locksCancel`, `actionLabel` | A step that needs an uploaded document; a step after which cancelling is no longer allowed; the text of its button. |
+| `limits` | Named amounts that conditions compare against, stored in the database and editable in the app. |
+
+**Versioning.** A definition is stored in the database the first time it is seen. A higher `version` becomes a new row; an existing version is never overwritten. Each request is pinned to the version it was created with, and to a copy of the limits in force at that moment, so editing a module never reroutes work already in flight. Edits made in the app publish a new version the same way.
+
+**Validation.** All definitions are validated when the API starts (known field types, step types, operators and roles; condition references that exist; and so on). A typo stops startup with a message naming the file, instead of surfacing later as a broken form.
+
+The full format, every option and the rules above are in [docs/definitions.md](docs/definitions.md).
+
+## The workflow engine
+
+A request moves through its definition's steps in order.
+
+- **Statuses.** A request is *In progress*, *Closed*, *Rejected* or *Cancelled*. While in progress, the current step's name is what users see. Approval status is *Pending*, *Approved* or *Rejected*.
+- **Closing.** The request closes automatically when its last step completes.
+- **Routing.** Each step's actors are resolved when it becomes active (the reporting manager is read from the organisation data at that moment). A conditional step is evaluated at that moment too and is marked not required when its condition is false.
+- **Rules about who may act.** The actor of the current step may act; the requester may cancel until a `locksCancel` step is done; an Admin may reject at any step as an operational override; nobody may approve or reject their own request at an approval step.
+- **Transactions.** Every action runs in one database transaction that also writes its audit events, and calls the request hooks. A change and its audit record cannot get out of step.
+- **Hooks.** A small interface (`IRequestHook`) is called inside that transaction when a request is created, when a step is done and when the request ends. The SIM, asset and ID card flows use it to update the masters (holder, status, history, condition and cost) atomically with the step that causes the change. Allocation uses conditional updates, so two requests cannot take the same item.
+- **Concurrency.** Each request carries a row version; acting on a stale view returns a conflict instead of overwriting.
+- **Money** is held in whole minor units (paise) everywhere and written in rupees at the edges.
+
+## Roles and access
+
+Ten roles: **Employee, Manager, Admin, Finance, HR, IT, Store, Security, Management, System admin.**
+
+- A request can be opened by the person who raised it, by anyone who has acted on it or is currently asked to act on it, by the requester's manager, and by Admin, System admin and Management (read-only). Everyone else gets "not found", which does not reveal that it exists.
+- **Waiting for me** lists what needs your action. **Handled by me** lists requests you personally acted on. **All requests** (Admin, System admin, Management) shows everything read-only. **Team requests** shows a manager's reports.
+- **Limits and conditions** are edited by Management and System admin. Management owns the money policy and System admin applies it.
+- **Masters** are maintained by the roles that own them (SIM: Admin and Management; laptop and IT asset: IT, Admin and Management; ID card: HR, Admin and Management). Others are read-only. Holder and status change only through the request flows.
+- **System admin** is a technical role: it configures but takes no business actions and sits in no approval chain.
+
+## Design choices and why
+
+| Choice | Why |
+|--------|-----|
+| **Definitions as JSON files, stored and versioned in the database** | A process is readable, diffable and reviewable, and changing it needs no code. Pinning each request to a version keeps work in flight stable. |
+| **A deliberately small workflow model** (two step kinds, four request statuses) | Everything the processes need fits without a rules language. A small model is easy to reason about, test and explain. |
+| **Conditions as structured data, not expression strings** | Nothing is evaluated from text, so there is nothing to inject and the editor can show conditions as dropdowns. |
+| **SQLite + Dapper** | Zero setup for anyone who clones the repository, explicit and reviewable SQL, no hidden queries. A dialect layer isolates the few SQLite-specific parts so a different database is a contained change. |
+| **Entity Framework only for Identity** | Identity needs it; everything else benefits from plain SQL, batched queries instead of N+1, and server-side paging. |
+| **DbUp with embedded scripts** | The schema is versioned with the code and applied the same way everywhere, including a clean clone. |
+| **JWT bearer, server-side policies** | Simple and stateless for a single API. Authorisation is checked on the server for every endpoint. |
+| **One response wrapper with error codes and field errors** | The web app handles every failure the same way and can show a message beside the exact field. |
+| **Audit written in the same transaction** | The trail is trustworthy: it records exactly what was committed. |
+| **Soft delete everywhere** | Nothing is destroyed. Masters are retired with a flag and a timestamp, documents are marked removed, and history stays complete. |
+| **Money as integer minor units** | No floating-point rounding in limits, conditions or totals. |
+| **Hooks inside the transaction** | Master updates cannot drift from the request that caused them. |
+| **Single-process production hosting** | The API serves the built web app, so there is one thing to run, one address, and no cross-origin configuration. |
+| **Signals and standalone components in Angular** | Less boilerplate and clear local state. Role groups are constants shared by the router guards and the menu. |
+
+## Practices followed
+
+- **Layering with inward dependencies**, repository interfaces in the application layer, and no data access in controllers.
+- **No magic strings.** Roles, policies, statuses, error codes, audit event types, lookup kinds and step and field types are constants or enums on both sides.
+- **Validation at the edge**, with FluentValidation filters returning field-level messages, and again inside the engine for the rules that matter.
+- **One exception-handling middleware** maps typed domain exceptions (not found, validation, conflict, rule refused) to consistent responses; unexpected errors become a generic message plus a correlation id, never a stack trace.
+- **Correlation id on every request**, in logs, in the response header and in the stored error record.
+- **No secrets in the repository.** The shipped signing key is a labelled development placeholder; production supplies its own through the environment. The API refuses to start in Production with demo mode on unless that is switched on deliberately.
+- **Safe uploads:** server-generated file names, a type allow-list, a size cap applied before the body is read, paths checked to stay inside the data folder, and downloads sent as attachments with `nosniff`.
+- **Queries written to avoid N+1**: joins, batched lookups and aggregate queries for counters; sort columns come from a fixed list and values are always parameters.
+- **Concurrency safety** through row versions and guarded updates, not through hoping two people never click at once.
+- **Idempotent start-up**: migrations, definition sync and seeding can run on every start without duplicating anything.
 
 ## Configuration
 
 | Key | Meaning |
 |-----|---------|
-| `Demo:Enabled` | Default true. Creates the sample organisation, the demo users, the role cards and the demo requests. Set it to false in any deployment. |
-| `Jwt:SigningKey` | Signing key for tokens. Supply a private key through the environment (`Jwt__SigningKey`) whenever demo mode is off; the shipped value is a development placeholder. |
+| `Demo:Enabled` | Default true. Creates the sample organisation, demo users, the role cards and demo requests. Set it to false in any real deployment. |
+| `Demo:AllowInProduction` | In a Production environment the API refuses to start with demo mode on unless this is true. |
+| `Jwt:SigningKey` | Token signing key (at least 32 bytes). Supply a private one through the environment (`Jwt__SigningKey`) whenever demo mode is off. |
 | `Bootstrap:AdminEmail`, `Bootstrap:AdminPassword` | Create the first system administrator when demo mode is off and no user exists. |
+| `Storage:DataDirectory` / `ADMINDESK_DATA_DIR` | Where the databases and uploaded documents live (default `data/`). |
+| `ADMINDESK_LOG_DIR` | Where the rolling log files go (default `logs/`). |
 | `Jobs:Provider` | `Hangfire` (default) or `Timer`. |
-| `Definitions:OverrideDirectory` | Extra or replacement definition files. |
+| `Definitions:OverrideDirectory` | Extra or replacement definition files, for trying a sample module. |
+| `Logging:Db:*` | Switch and retention for the `logs` table (App 30 days, Email 365 by default). |
 
 Any key can be set as an environment variable with double underscores, for example `Demo__Enabled=false`.
 
-## Production
+## Self-check (engine probe)
 
-Build the web app and copy its output next to the API:
+Alongside the app there is an in-process **engine probe**: a scripted run that creates requests and walks every module through approvals, tasks, conditions, documents, master updates and role checks, asserting the results and the audit trail. It runs against a throwaway database.
+
+It is a start-up diagnostic, not a unit-test suite, and it calls the services directly rather than over HTTP. To run it, start the API once in the Development environment with demo mode on:
 
 ```
-cd frontend
-npm run build
+set ASPNETCORE_ENVIRONMENT=Development
+set Demo__Enabled=true
+set Diagnostics__RunEngineProbe=true
+set ADMINDESK_DATA_DIR=%TEMP%\admindesk-probe
+dotnet run --project backend/src/AdminDesk.Api
 ```
 
-Copy the contents of `frontend/dist/admindesk-web/browser` into `backend/src/AdminDesk.Api/wwwroot`. The API then serves the web app itself: unknown paths return the start page, `/api` keeps answering JSON, and `/hangfire` is not served.
+and read the log for `ENGINE PROBE PASSED (N checks)` or the failing check. The probe refuses to run in any other environment. `node scripts/check-field-types.mjs` separately checks that the form renderer covers every field type.
 
-## Logging
+## Running it as one process
 
-Every log line goes to the console and to a daily rolling file under `logs/`. Warnings and errors are additionally written in batches, together with the correlation id of the request, to the `logs` table of the application database. No screen or endpoint shows that table yet; read it with any SQLite tool. Every response carries an `X-Correlation-ID` header that matches the stored correlation id, so a reported error can be found from the id. Information-level request logs go to the console and the file only.
+For a deployment, build the web app and let the API serve it:
 
-The table keeps App events for `Logging:Db:RetentionDays:App` days (default 30) and Email events for `Logging:Db:RetentionDays:Email` days (default 365); older rows are purged when the API starts. `Logging:Db:Enabled` switches the table writing off. Email sending events will be recorded in the same table in a later release.
+```
+cd frontend && npm run build
+```
 
-## Security notes
+Copy the contents of `frontend/dist/admindesk-web/browser` to a `wwwroot` folder next to the published API. The API then serves the web app itself: page addresses return the start page, files are served as files, and `/api` keeps answering JSON. Sign-in is still required for everything except the sign-in page and its files.
 
-- The JWT is kept in the browser's local storage, which scripts on the page can read. The token lifetime is short (8 hours). For a production deployment, serve the app with a content security policy.
-- Demo accounts and the shared practice password exist only while `Demo:Enabled` is true. The API logs a warning if demo mode is on in a Production environment.
-- Authorisation is enforced on the server; hiding a button in the web app is never the only control.
+For a real deployment set `Demo__Enabled=false`, a private `Jwt__SigningKey` and the `Bootstrap__Admin*` values, and serve the app over HTTPS with a content security policy (the token is kept in local storage, which scripts on the page can read; its 8-hour lifetime limits the exposure).
+
+## Project layout
+
+```
+backend/src/
+  AdminDesk.Api/             controllers, policies, middleware, hosting of the web app
+  AdminDesk.Application/     workflow service, queries, documents, masters, limits editor
+  AdminDesk.Domain/          definitions, step planner, rule evaluator, status deriver
+  AdminDesk.Infrastructure/  repositories, migrations, identity, jobs, storage, seeding, hooks
+  AdminDesk.SharedKernel/    constants, enums, exceptions, money, response wrapper
+frontend/src/app/
+  core/                      API clients, auth, constants, navigation, theme
+  features/                  one folder per screen area (inbox, requests, masters, limits...)
+  shared/                    reusable components (dynamic form fields, dialogs, tags)
+definitions/                 the modules, one JSON file each
+docs/definitions.md          the definition format
+scripts/                     dev.ps1 / dev.sh, the field-type check, sample definitions
+```
 
 ## Assumptions
 
 The process description leaves some things open. What was chosen:
 
-1. The workflow model is deliberately small: two step kinds, approval and task; four request statuses (In progress, Closed, Rejected and Cancelled); three approval statuses (Pending, Approved and Rejected). While a request is in progress, the name of the current step is the status shown. There is no draft, no editing after creating and no comment thread. Reject and Cancel, both with a reason, are not described in the process description and were added as the smallest possible rule set.
-2. Cancel is allowed while the request is in progress, by the requester only, and always with a reason, until the step that hands over the item is done (Issue material for stationery, Dispatch for courier); after that Cancel is no longer offered and the server refuses it. Nobody else can cancel someone's request, not the Admin, System admin or Management. The lock is read from the definition version the request was created with, so a request raised before that version keeps the old rule. A manager cannot cancel a report's request. Reject is allowed to whoever holds an approval step at that step, and to the Admin at any step of an in-progress request (System admin and Management cannot reject on other people's requests); it is never locked. Any reject, at an approval step or a task step, ends the request as Rejected with approval status Rejected, so it is never counted as Approved or Pending; a cancel keeps the approval status it had. The audit trail records who acted, in which role (Admin, Requester or the step's role) and the reason, and the requester sees both on the timeline.
-3. Visibility: a request can be opened by the person who raised it, by anyone who has acted on it or is asked to act on it, by the manager of the person who raised it (read-only, apart from their own step actions) and by Admin, System admin and Management, who see every request read-only. Everyone else gets "not found". The dashboard counters show the signed-in person's own requests, except for those three roles, who see the whole organisation. They also get an All requests page (not the System admin, whose menu is minimal; its API access stays read-only), and managers get a Team requests page with the requests of their direct reports. Seeing a request gives no right to act on it.
-4. Role changes apply at the next sign-in.
-5. A step's actors may be a list of roles; anyone holding one of them can act.
-6. The courier delivery confirmation is done by the requester, because the process description does not say who confirms delivery.
-7. The requester's receipt confirmation and delivery confirmation are the digital acknowledgement: the time and the name are recorded on the step and in the audit trail.
-8. Stock availability and the stock update step are manual Store confirmations until stock arrives in the system.
-9. Closure is automatic when the last step completes.
-10. Waiting for me is open to every role, so a requester sees their own confirmation tasks there. Its SLA column is a placeholder.
-11. A step that nobody can act on, for example a reporting-manager approval for someone who has no manager, simply waits; nothing is skipped automatically. The person who raised it can cancel it with a reason. A request raised by the Management demo user waits at its first step for exactly this reason: that user's reporting manager is the top of the hierarchy (employee E0011), who has no login and no demo account.
-12. The Audit trail section on the request page is visible to Admin, System admin and Management only.
-13. Limits and step conditions are edited on the Limits and conditions page by Management and System admin together. The process description does not name an owner: Management owns the money policy and System admin applies it. Management stays read-only everywhere else, and every change is in the audit trail with the old and new values. Edits apply to new requests only: limits are copied onto each request when it is created, and a condition edit publishes a new definition version, so requests in progress keep theirs. A definition file whose version is equal to or lower than a stored edit is ignored, so bump the file version above the stored one.
-14. The Management role is read-only across the organisation (every request, the All requests page, organisation counters and the audit trail) and approves only at steps assigned to it. No shipped module routes to Management, so a Management login sees an empty Waiting for me list. The System admin is a technical role: it configures definitions and limits and sees the Module definitions page, takes no business actions and is not part of any approval chain. The request lists and New request are closed to it, while a direct link to a request still opens read-only for support. Only the Admin has the operational override (reject at any step).
-15. Segregation of duties: the process description does not say whether a person may approve their own request, so nobody can approve or reject their own request at an approval step, even when they hold the role of that step (for example a Store person raising a stationery request cannot do the Admin or Store verification; an Admin can). Task steps (issuing, stock confirmation, receipt confirmation) are not affected, and the Admin's operational reject override still applies.
-16. The people directory (the People page in the menu) is open to managers, Admin, HR, Management and System admin. Managers see their direct reports; the others see everyone. Each row shows the code, name, designation, department and location; email addresses are not shown.
-17. The process description does not say who completes the courier proof of delivery upload, so it is a task for the Admin, after the requester has confirmed delivery. The step cannot be completed until a document has been uploaded for it.
-18. Finance approval on the SIM and Laptop requests is a step taken from the approval matrix, because the individual flows do not show it. It is required only when the entered cost is above the Finance limit, which is zero by default (any payment involved); an empty cost never triggers it. Management is not in those rows. The cost field is an addition to the two forms so the "if required" rule has a value to compare.
-19. The approval matrix is seeded only for the modules that exist now (SIM and Laptop or IT asset). The rows for Travel, Advances, Petty Cash, Purchase, Maintenance and the others arrive with those modules.
-20. Actors the process description does not name: Welfare approval is by the reporting manager; Courier proof of delivery is uploaded by the Admin; a SIM return is handed in by the employee and then verified by the Admin; the Laptop and asset steps are shared by IT and Admin; ID card verification is by HR and printing and handover by Admin; SIM verification, allocation and activation are Admin steps; housekeeping has no approval step and is handled by the Admin; acknowledgement and confirmation steps belong to the requester.
-21. SIM return and Asset return are separate modules from the request flows. A SIM replacement or transfer request records its type in the history, and the old SIM is returned through a SIM return request.
-22. Nobody can approve or reject their own request at an approval step, even when they hold the role of that step.
-23. Documents are stored on local disk under the data folder. PDF, image and Office files up to 5 MB are accepted. Removing a document is a soft delete that keeps the file and the audit rows, every download is audited, and Management and System admin are read-only. The ID card photo is attached as a supporting document.
-24. Masters (SIM, laptop and IT asset, ID card) are seeded sample data shown on the Masters page. Records are maintained by their owning roles, and Management can manage all of them: the SIM master by Admin and Management; the laptop and IT asset master by IT, Admin and Management; the ID card master by HR, Admin and Management. Everyone else, System admin included, is read-only, and HR sees the ID card master only. Retiring a record sets an inactive flag and a timestamp (nothing is deleted) and is refused while the item is held. Every change is audited with the old and new values, and holder and status change only through the request flows. The process description names no maintainer beyond the Admin, IT and HR steps. Asset condition and any damage or loss cost are recorded at return, and an ID card replacement keeps the old card as Replaced.
-25. The Handled by me list (IT, HR, Finance, Store, Security and managers) shows only requests the signed-in person personally dealt with: they approved, completed, rejected, cancelled or closed a step, or they are or were named as the actor of a step by name (for example as the reporting manager). Holding a role that has or had a step does not count, and neither does raising a request. Everyone on that list can open the request later. A role holder sees a request only while a step assigned to that role is waiting.
+1. **The workflow model is deliberately small.** Two step kinds (approval and task), four request statuses, three approval statuses. There is no draft, no editing after creation and no comment thread. Reject and cancel, both with a reason, are the smallest rule set that lets a request end early.
+2. **Cancel** is for the requester only, with a reason, while the request is in progress and until a step marked `locksCancel` is done (issuing the item for stationery, dispatch for courier). Nobody else can cancel someone's request. **Reject** is allowed to whoever holds an approval step at that step, and to the Admin at any step; it is never locked.
+3. **Nobody can approve or reject their own request** at an approval step, even when they hold the role of that step. The process description does not say either way; this is the safer reading. Task steps are not affected.
+4. **Visibility.** See [Roles and access](#roles-and-access). Seeing a request never gives the right to act on it. Role changes apply at the next sign-in.
+5. **A step with nobody to act on it** (for example a manager step for someone with no manager) simply waits; nothing is skipped automatically. The top of the demo hierarchy is a person with no login, so a request raised by the Management demo user waits at its first manager step.
+6. **Acknowledgements.** The requester's receipt and delivery confirmations are the digital acknowledgement; time and name are recorded on the step and in the audit trail.
+7. **Closure** is automatic when the last step completes.
+8. **Actors the description does not name:** Welfare approval is the reporting manager; courier proof of delivery is uploaded by the Admin after the requester confirms delivery; a SIM return is handed in by the employee and verified by the Admin; Laptop and asset steps are shared by IT and Admin; ID card verification is HR, printing and handover Admin; SIM verification, allocation and activation are Admin steps; Housekeeping has no approval step and is handled by the Admin.
+9. **Finance on SIM and Laptop** is a step taken from the approval matrix, because the individual flows do not show it. It is required only when the entered cost is above the Finance limit, which is zero by default (any payment involved). An empty cost never triggers it. The cost field is an addition to those forms so the rule has a value to compare.
+10. **The approval matrix is seeded only for the modules that exist** (SIM and Laptop or IT asset). The rows for the other processes arrive with those modules.
+11. **Limits and step conditions** are edited by Management and System admin together; the description names no owner. Every change is audited with old and new values and applies to new requests only. A definition file whose version is not higher than a stored edit is ignored, so bump the file version above the stored one.
+12. **Management is read-only across the organisation** and approves only at steps assigned to it. **System admin** takes no business actions. Only the Admin has the operational reject override.
+13. **Documents** are stored on local disk under the data folder. PDF, image and Office files up to 5 MB are accepted. Removing one is a soft delete that keeps the file and the audit rows; every download is audited. Management and System admin are read-only; a document can be tagged to a step only when it is the current step and the uploader can act on it.
+14. **Masters** (SIM, laptop and IT asset, ID card) are seeded sample data. Records are maintained by their owning roles; retiring sets an inactive flag and a timestamp and is refused while the item is held; every change is audited with old and new values. The description names no maintainer beyond the Admin, IT and HR steps. Returns record condition and any damage or loss cost, and an ID card replacement keeps the old card as Replaced. Identifiers (SIM number, mobile number, asset tag, serial number, card number) are unique, ignoring case and spaces.
+15. **Handled by me** shows only requests the signed-in person personally dealt with (approved, completed, rejected, cancelled or closed a step, or is or was named as the actor of a step). Holding a role that has or had a step does not count, and neither does raising a request.
+16. **The people directory** is open to managers (their reports), Admin, HR, Management and System admin. Email addresses are not shown.
+17. **Money amounts** are limited to one billion rupees per field.
+18. **Stock availability and the stock update** steps are manual Store confirmations until stock exists in the system.
 
-## Not built in this release
+## Not built
 
-Left out on purpose:
+Left out on purpose (time):
 
-- the JSON definition editor (definitions are viewed on the Module definitions page and edited as files)
+- a JSON definition editor in the app (definitions are viewed on the Module definitions page and edited as files; limits and conditions can be edited in the app)
 - a phone-sized layout for approvals
-- the vehicle master and trips
-- guest house rooms
+- the vehicle master and trips, guest house rooms
 - event, parking, food and pantry, vehicle, and uniform and PPE modules
 
 Not built yet:
 
-- Settings page and global search
-- the jobs dashboard
-- the automatic stock effect of the stock update step
-- notifications and background business jobs
-- the remaining modules
-- service levels: the SLA column in Waiting for me is a placeholder showing "Not set", and the age colours there use placeholder thresholds
-
-## Checks
-
-`node scripts/check-field-types.mjs` checks that the form renderer covers every field type.
+- the money flows (travel, travel advance, petty cash, general advance) with settlement, recovery schedules and the petty cash register
+- purchase, vendors and contracts, and the stock master with its automatic stock effects
+- the helpdesk with service levels and escalation; the SLA column in Waiting for me is a placeholder showing "Not set"
+- scheduled reminders and notifications, and the jobs dashboard
+- the admin dashboard, exports and reports, budget control and cost allocation reports
+- a global search and a settings page
+- integration with external systems (ERP, payroll) and SMS
+- a unit-test project; behaviour is covered by the engine probe described above

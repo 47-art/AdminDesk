@@ -28,3 +28,7 @@ data/
 
 # Built web app copied next to the API for production
 backend/src/AdminDesk.Api/wwwroot/
+
+# Working notes that are not part of the product documentation
+docs/hangfire-spike.md
+docs/postgresql-path.md
